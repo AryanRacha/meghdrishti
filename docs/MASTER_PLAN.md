@@ -5,21 +5,16 @@ A Spatial Deep Learning (U-Net) Blending Engine that dynamically learns which fo
 
 ## 2. Completed Phases (Architecture & ML)
 - **Monorepo Setup**: FastAPI backend, React (Vite/TS) frontend, ML pipeline separated.
-- **Data Pipeline**: Automated fetchers for GFS (AWS S3) and ERA5 (Copernicus CDS) implemented with xarray regridding.
-- **ML Architecture**: Spatial U-Net built in PyTorch (unet_blender.py).
-- **The 'Winning Edge'**: ExtremeWeightedMSELoss implemented to heavily penalize missing high-rainfall events.
-- **Training Loop**: 	rain.py built with robust 	ry/except fallbacks for Windows C-library limitations.
+- **Data Pipeline**: Automated fetchers for GFS (AWS S3), ERA5 (Copernicus CDS), and GraphCast (Synthetic 2023 Generation) implemented.
+- **ML Architecture**: Multi-Head Super-UNet with FiLM built in PyTorch (unet_blender.py).
+- **The 'Winning Edge'**: ExtremeWeightedMSELoss implemented to heavily penalize missing high-rainfall events, balanced with Z-score normalizers.
+- **Training Loop**: Completed. GPU optimized with AMP, `num_workers=0`, and `cfgrib.open_datasets()` list-shattering. `unet_blender_weights.pth` successfully generated.
 
-## 3. Pending Phases (To Execute on New System)
+## 3. Pending Phases (To Execute Next)
 
-### Phase 3A: Heavy Data Download & Model Training (Requires GPU)
-1. Add Copernicus API key to ~/.cdsapirc.
-2. Run data fetchers to download 1-5 years of historical Indian-bound weather grids.
-3. Execute python train.py on the GPU to generate the final unet_blender_weights.pth.
-
-### Phase 3B: Backend Inference (No GPU Required)
+### Phase 3B: Backend Inference
 1. Build FastAPI endpoints (e.g., GET /api/v1/forecast/blended).
-2. Write logic to load the .pth weights, run the daily forecast grids through the U-Net, and output GeoJSON arrays.
+2. Write logic to load the `.pth` weights, run the daily forecast grids through the U-Net, and output GeoJSON arrays.
 
 ### Phase 3C: Frontend Dashboard (No GPU Required)
 1. Build React UI with Leaflet.js.

@@ -57,7 +57,7 @@ def calibrate_extremes(data_dir):
     print("Set beta (e.g. 2.0 or 3.0) to aggressively scale up towards the 99th percentile.")
 
 if __name__ == "__main__":
-    target_dir = "../data/raw/era5"
+    target_dir = "data/raw/era5"
     if os.path.exists(target_dir):
         calibrate_extremes(target_dir)
     else:

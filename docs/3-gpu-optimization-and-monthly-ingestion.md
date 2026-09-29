@@ -12,10 +12,10 @@ Accelerate data ingestion and training throughput to leverage enterprise-grade G
 - **Storage Standard**: Standardized output naming to `data/raw/era5/era5_{year}_{month}.nc`.
 
 ### 2. High-Throughput GPU Training Configuration (`ml_pipeline/train.py`)
-- **Memory Footprint Scaling**: Increased `BATCH_SIZE` to 32 (expandable to 64 for 24GB VRAM).
+- **Memory Footprint Scaling**: Increased `BATCH_SIZE` to 64 for 24GB VRAM.
 - **Gradient Accumulation Deactivation**: Set `ACCUMULATION_STEPS = 1` for immediate parallelized backpropagation across the RTX 4090 architecture.
 - **Automatic Mixed Precision (AMP)**: Integrated `torch.amp.autocast('cuda')` and `torch.amp.GradScaler('cuda')` to utilize 4th-Gen Tensor Cores.
-- **I/O Acceleration**: Configured `DataLoader` with `num_workers=4` and `pin_memory=True` on CUDA devices.
+- **I/O Optimization**: Configured `DataLoader` with `num_workers=0` (to prevent Windows multiprocessing errors) and `pin_memory=True` on CUDA devices.
 - **Extreme Event Loss**: Preserved continuous extreme-weighted MSE loss to protect high-impact rainfall events.
 
 ## Execution & Verification Commands

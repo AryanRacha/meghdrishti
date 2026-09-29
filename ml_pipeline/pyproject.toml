@@ -3,7 +3,7 @@ name = "ml-pipeline"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12, <3.14"
 dependencies = [
     "boto3>=1.43.103",
     "cdsapi>=0.7.7",
@@ -12,8 +12,23 @@ dependencies = [
     "numpy>=2.5.3",
     "pandas>=3.0.6",
     "scipy>=1.18.1",
-    "torch>=2.14.0",
-    "torchvision>=0.29.0",
+    "torch",
+    "torchvision",
     "xarray>=2026.7.0",
 ]
 
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+
+[tool.uv]
+environments = [
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]

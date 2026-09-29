@@ -44,6 +44,9 @@ def download_era5_surface_data(
                 'format': 'netcdf',
                 'variable': [
                     'total_precipitation',
+                    '2m_temperature',
+                    '10m_u_component_of_wind',
+                    '10m_v_component_of_wind',
                 ],
                 'year': year,
                 'month': month,
@@ -89,9 +92,8 @@ if __name__ == "__main__":
 
         for year in years:
             for month in months:
-                # 30 days for June ('06') and Sept ('09'); 31 days for July ('07') and August ('08')
-                max_days = 30 if month in ["06", "09"] else 31
-                month_days = [f"{d:02d}" for d in range(1, max_days + 1)]
+                # Bundle an entire month's days into a single API request payload
+                month_days = [f"{d:02d}" for d in range(1, 32)]
 
                 print(f"\n--- Processing {year}-{month} ({len(month_days)} days) ---")
                 download_era5_surface_data(

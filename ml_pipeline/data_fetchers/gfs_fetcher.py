@@ -45,7 +45,13 @@ class GFSFetcher:
             return None
 
 if __name__ == "__main__":
-    fetcher = GFSFetcher(output_dir="../../data/raw/gfs")
-    # MVP Prototype: Fetch August 1, 2023, 00Z cycle, 24-hour forecast
-    # fetcher.fetch_historical_forecast('20230801', '00', 24)
-    logger.info("GFSFetcher initialized.")
+    # Point to ml_pipeline/data/raw/gfs
+    fetcher = GFSFetcher(output_dir="data/raw/gfs")
+    
+    # We are training on August 2023, so download all 31 days
+    logger.info("Starting historical GFS bulk download for August 2023...")
+    for day in range(1, 32):
+        date_str = f"202308{day:02d}"
+        fetcher.fetch_historical_forecast(date_str, '00', 24)
+        
+    logger.info("GFS Download complete!")
