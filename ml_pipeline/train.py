@@ -1,7 +1,9 @@
+import os
+import logging
+from typing import Dict, List, Tuple
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import logging
 from tqdm import tqdm
 
 from models.unet_blender import UNetBlender
@@ -11,70 +13,107 @@ from data_loaders.weather_dataset import ProductionWeatherDataset
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def train():
+def train() -> None:
+    # Hardware verification and setup
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logger.info(f"Starting training on {device}...")
+    use_cuda = device.type == 'cuda'
+    
+    logger.info(f"Target execution device: {device}")
+    if use_cuda:
+        gpu_name = torch.cuda.get_device_name(0)
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        logger.info(f"Detected GPU: {gpu_name} ({vram_gb:.2f} GB VRAM)")
+    else:
+        logger.info("CUDA device not detected; executing fallback on CPU.")
 
-    # Hyperparameters
-    batch_size = 16
-    learning_rate = 1e-4
-    epochs = 5
+    # High-performance hyperparameters optimized for 24GB RTX 4090
+    BATCH_SIZE: int = 32  # Scaled up for 24GB VRAM footprint (can scale to 64 if memory headroom permits)
+    LEARNING_RATE: float = 1e-4
+    EPOCHS: int = 5
+    ACCUMULATION_STEPS: int = 1  # Deactivated (step per batch) for direct high-throughput parallel execution
 
-    # Dataloader (Dummy stats and dates for now, you will need to replace these with real computed stats and dates)
-    dummy_stats = {
+    # Dataloader configurations
+    stats_dict: Dict[str, Tuple[float, float]] = {
         'gfs': (5.0, 10.0),
         'ai': (4.5, 9.5),
         'dem': (500.0, 1000.0),
         'lead_time': (24.0, 1.0)
     }
-    dummy_dates = ['2023-08-01', '2023-08-02']
+    dates: List[str] = ['2023-08-01', '2023-08-02']
 
-    train_dataset = ProductionWeatherDataset(data_dir='../data/processed', dates=dummy_dates, stats_dict=dummy_stats, target_shape=(128, 128))
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    data_dir = os.path.join(os.path.dirname(__file__), '../data/processed')
+    train_dataset = ProductionWeatherDataset(
+        data_dir=data_dir,
+        dates=dates,
+        stats_dict=stats_dict,
+        target_shape=(128, 128)
+    )
 
-    # Model
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        num_workers=4 if use_cuda else 0,
+        pin_memory=use_cuda
+    )
+
+    # Spatial U-Net Model (4 input channels: GFS, AI, DEM, Lead Time; 2 output weight channels)
     model = UNetBlender(n_channels=4, n_models=2, features=[32, 64, 128, 256]).to(device)
 
-    # Optimizer & Loss
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
+    # Optimizer, Extreme Weather Preserving Loss, and AMP Scaler
+    optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE)
     criterion = ContinuousExtremeWeightedMSELoss(alpha=0.5, beta=2.0)
+    scaler = torch.amp.GradScaler('cuda', enabled=use_cuda)
+
+    logger.info(
+        f"Initialized pipeline -> Batch Size: {BATCH_SIZE}, "
+        f"Accumulation Steps: {ACCUMULATION_STEPS}, AMP: {use_cuda}"
+    )
 
     # Training Loop
-    for epoch in range(epochs):
+    for epoch in range(EPOCHS):
         model.train()
         epoch_loss = 0.0
 
-        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}")
-        for inputs, forecasts, targets in progress_bar:
-            inputs = inputs.to(device)
-            forecasts = forecasts.to(device)
-            targets = targets.to(device)
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS}")
+        optimizer.zero_grad()
 
-            optimizer.zero_grad()
+        for batch_idx, (inputs, forecasts, targets) in enumerate(progress_bar):
+            inputs = inputs.to(device, non_blocking=use_cuda)
+            forecasts = forecasts.to(device, non_blocking=use_cuda)
+            targets = targets.to(device, non_blocking=use_cuda)
 
-            # 1. Forward Pass: Predict spatial weight maps
-            weight_maps = model(inputs) # Shape: [Batch, 2, H, W]
+            # Mixed Precision Forward Pass (Tensor Cores)
+            with torch.amp.autocast('cuda', enabled=use_cuda):
+                # 1. Forward Pass: Predict spatial blending weight maps
+                weight_maps = model(inputs)  # Shape: [Batch, 2, H, W]
 
-            # 2. Compute Blended Forecast
-            # Weight maps sum to 1.0 at every pixel.
-            # Multiply weights by actual forecast values and sum across models (dim=1).
-            blended_prediction = torch.sum(weight_maps * forecasts, dim=1, keepdim=True) # Shape: [Batch, 1, H, W]
+                # 2. Compute Blended Forecast
+                blended_prediction = torch.sum(weight_maps * forecasts, dim=1, keepdim=True)  # Shape: [Batch, 1, H, W]
 
-            # 3. Calculate Loss
-            loss = criterion(blended_prediction, targets)
+                # 3. Calculate Loss with Extreme Weather Weighting
+                loss = criterion(blended_prediction, targets)
+                loss = loss / ACCUMULATION_STEPS
 
-            # 4. Backward Pass & Step
-            loss.backward()
-            optimizer.step()
+            # 4. Backward Pass & Scaled Step
+            scaler.scale(loss).backward()
 
-            epoch_loss += loss.item()
-            progress_bar.set_postfix({'loss': loss.item()})
+            if (batch_idx + 1) % ACCUMULATION_STEPS == 0 or (batch_idx + 1) == len(train_loader):
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
 
-        logger.info(f"Epoch {epoch+1} completed. Average Loss: {epoch_loss / len(train_loader):.4f}")
+            loss_val = loss.item() * ACCUMULATION_STEPS
+            epoch_loss += loss_val
+            progress_bar.set_postfix({'loss': f"{loss_val:.4f}"})
 
-    logger.info("Training complete. Saving weights...")
-    torch.save(model.state_dict(), "unet_blender_weights.pth")
-    logger.info("Model saved to unet_blender_weights.pth")
+        avg_loss = epoch_loss / len(train_loader) if len(train_loader) > 0 else 0.0
+        logger.info(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
+
+    weights_path = "unet_blender_weights.pth"
+    logger.info(f"Training complete. Saving weights to {weights_path}...")
+    torch.save(model.state_dict(), weights_path)
+    logger.info(f"Model saved successfully to {weights_path}")
 
 if __name__ == '__main__':
     train()
