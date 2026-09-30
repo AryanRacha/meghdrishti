@@ -8,6 +8,7 @@ interface ThreatMatrixProps {
   loading: boolean
   selectedId: string | null
   onSelect: (id: string) => void
+  onOpenBulletin?: () => void
 }
 
 const NEAR_KM = 60
@@ -97,7 +98,7 @@ function ThreatCard({ threat, selected, onSelect }: { threat: Threat; selected: 
   )
 }
 
-export function ThreatMatrix({ threats, loading, selectedId, onSelect }: ThreatMatrixProps) {
+export function ThreatMatrix({ threats, loading, selectedId, onSelect, onOpenBulletin }: ThreatMatrixProps) {
   const [open, setOpen] = useState(false) // mobile bottom sheet only
   const extreme = threats.filter((t) => t.category !== 'heavy').length
   const exposed = threats.reduce((sum, t) => sum + t.population_exposed, 0)
@@ -138,6 +139,19 @@ export function ThreatMatrix({ threats, loading, selectedId, onSelect }: ThreatM
           <ThreatCard key={t.id} threat={t} selected={t.id === selectedId} onSelect={() => onSelect(t.id)} />
         ))}
       </ul>
+
+      {onOpenBulletin && (
+        <div className="border-t border-white/10 p-2.5">
+          <button
+            type="button"
+            onClick={onOpenBulletin}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-red-600/20 py-2 text-xs font-semibold text-red-200 ring-1 ring-red-500/40 transition-colors hover:bg-red-600/30 hover:text-white"
+          >
+            <span>Generate Official IMD Bulletin</span>
+            <span>📄</span>
+          </button>
+        </div>
+      )}
     </GlassPanel>
   )
 }

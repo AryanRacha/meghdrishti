@@ -22,6 +22,9 @@ import { useSpeech } from './hooks/useSpeech'
 import { useStoryMode } from './hooks/useStoryMode'
 import { LANGUAGES, alertText, languagesFor, type LangCode } from './lib/alerts'
 import { scaleFor } from './lib/colorScales'
+import { CircleMarker } from 'react-leaflet'
+import { BulletinModal } from './components/panels/BulletinModal'
+import { PixelInspector } from './components/panels/PixelInspector'
 import type { Panels } from './lib/storyScript'
 import type { AlertsResponse, ForecastGrid, Layer, MetaResponse, Variable } from './types/forecast'
 
@@ -45,6 +48,10 @@ function App() {
   const [selectedThreat, setSelectedThreat] = useState<string | null>(null)
   const [lang, setLang] = useState<LangCode | null>(null)
   const [dispatchOpen, setDispatchOpen] = useState(false)
+  const [bulletinOpen, setBulletinOpen] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('bulletin'),
+  )
+  const [inspectPoint, setInspectPoint] = useState<{ lat: number; lon: number } | null>(null)
   const [resetKey, setResetKey] = useState(0)
   const [panels, setPanels] = useState<Panels>({ left: true, right: true })
 
@@ -119,8 +126,8 @@ function App() {
   })
 
   return (
-    <main className={`relative h-full w-full overflow-hidden ${panels.right ? 'right-open' : ''}`}>
-      <ForecastMap>
+    <main className={`relative h-full w-full overflow-hidden ${panels.right ? 'right-open' : ''} print:h-auto print:overflow-visible`}>
+      <ForecastMap onMapClick={(lat, lon) => setInspectPoint({ lat, lon })}>
         {compare && left.data && right.data && scale ? (
           <SwipeCompare left={left.data} right={right.data} scale={scale} position={swipe} />
         ) : (
@@ -130,56 +137,76 @@ function App() {
           <RainAnimation grid={single.data} />
         )}
         <ThreatMarkers threats={threats} selectedId={selectedThreat} onSelect={selectThreat} />
+        {inspectPoint && (
+          <CircleMarker
+            center={[inspectPoint.lat, inspectPoint.lon]}
+            radius={7}
+            pathOptions={{ color: '#22d3ee', fillColor: '#06b6d4', fillOpacity: 0.9, weight: 2.5 }}
+          />
+        )}
         <MapController resetKey={resetKey} />
       </ForecastMap>
 
-      {compare && <SwipeDivider position={swipe} onChange={setSwipe} leftLabel="Raw GFS" rightLabel="Super-UNet blend" />}
+      {compare && (
+        <div className="print:hidden">
+          <SwipeDivider position={swipe} onChange={setSwipe} leftLabel="Raw GFS" rightLabel="Super-UNet blend" />
+        </div>
+      )}
 
       {/* Floating UI layer (above Leaflet panes/controls) */}
-      <div className="pointer-events-none absolute inset-0 z-[1100]">
-        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] flex-col gap-3 sm:w-80">
-          <Header run={alerts.data?.metadata ?? null} loading={loading} error={error} />
+      <div className="pointer-events-none absolute inset-0 z-[1100] print:static print:inset-auto print:h-auto print:w-full print:overflow-visible">
+        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] flex-col gap-3 sm:w-80 print:hidden">
+          <Header
+            run={alerts.data?.metadata ?? null}
+            loading={loading}
+            error={error}
+            onOpenBulletin={() => setBulletinOpen(true)}
+          />
           {meta.data && date && (
             <div className={`${SLIDE} ${slide(panels.left, 'left')}`}>
-            <ControlDock
-              dates={dates}
-              date={date}
-              onDate={setPickedDate}
-              leadTimes={meta.data.lead_times}
-              trainedLeadTimes={meta.data.trained_lead_times}
-              leadTime={leadTime}
-              onLeadTime={setLeadTime}
-              variable={variable}
-              onVariable={setVariable}
-              layer={layer}
-              onLayer={setLayer}
-              compare={compare}
-              onCompare={setCompare}
-              playing={playing}
-              onPlaying={setPlaying}
-              onTour={story.start}
-            />
+              <ControlDock
+                dates={dates}
+                date={date}
+                onDate={setPickedDate}
+                leadTimes={meta.data.lead_times}
+                trainedLeadTimes={meta.data.trained_lead_times}
+                leadTime={leadTime}
+                onLeadTime={setLeadTime}
+                variable={variable}
+                onVariable={setVariable}
+                layer={layer}
+                onLayer={setLayer}
+                compare={compare}
+                onCompare={setCompare}
+                playing={playing}
+                onPlaying={setPlaying}
+                onTour={story.start}
+              />
             </div>
           )}
         </div>
 
-        {story.caption?.panel && <StoryPanel panel={story.caption.panel} />}
+        {story.caption?.panel && (
+          <div className="print:hidden">
+            <StoryPanel panel={story.caption.panel} />
+          </div>
+        )}
 
         {story.caption && (
-          <div className="absolute top-4 left-1/2 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2">
-            <StoryBar caption={story.caption} onStop={story.stop} />
+          <div className="absolute top-4 left-1/2 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 print:hidden">
+            <StoryBar caption={story.caption} onNext={story.next} onStop={story.stop} />
           </div>
         )}
 
         {layerMeta && scale && (
-          <div className="absolute bottom-4 left-4 hidden sm:block">
+          <div className="absolute bottom-4 left-4 hidden sm:block print:hidden">
             <Legend metadata={layerMeta} scale={scale} />
           </div>
         )}
 
         {threat && date && activeLang && (
           <div
-            className={`absolute inset-x-4 bottom-20 transition-[left,right] duration-500 lg:bottom-4 ${panels.left ? 'lg:left-[22rem]' : 'lg:left-72'} ${panels.right ? 'lg:right-[26rem]' : 'lg:right-4'}`}
+            className={`absolute inset-x-4 bottom-20 transition-[left,right] duration-500 lg:bottom-4 ${panels.left ? 'lg:left-[22rem]' : 'lg:left-72'} ${panels.right ? 'lg:right-[26rem]' : 'lg:right-4'} print:hidden`}
           >
             <div className="appear mx-auto max-w-xl">
               <AlertCard
@@ -199,37 +226,71 @@ function App() {
         )}
 
         <div
-          className={`absolute inset-x-0 bottom-0 lg:inset-x-auto lg:top-4 lg:right-4 lg:bottom-4 lg:w-96 ${SLIDE} ${slide(panels.right, 'right')}`}
+          className={`absolute inset-x-0 bottom-0 lg:inset-x-auto lg:top-4 lg:right-4 lg:bottom-4 lg:w-96 ${SLIDE} ${slide(panels.right, 'right')} print:hidden`}
         >
-          <ThreatMatrix threats={threats} loading={alerts.loading} selectedId={selectedThreat} onSelect={selectThreat} />
+          <ThreatMatrix
+            threats={threats}
+            loading={alerts.loading}
+            selectedId={selectedThreat}
+            onSelect={selectThreat}
+            onOpenBulletin={() => setBulletinOpen(true)}
+          />
         </div>
 
-        <EdgeToggle
-          side="left"
-          open={panels.left}
-          onToggle={() => setPanels((p) => ({ ...p, left: !p.left }))}
-          label="controls"
-          shortcut="["
-        />
-        <EdgeToggle
-          side="right"
-          open={panels.right}
-          onToggle={() => setPanels((p) => ({ ...p, right: !p.right }))}
-          label="Threat Matrix"
-          shortcut="]"
-        />
+        <div className="print:hidden">
+          <EdgeToggle
+            side="left"
+            open={panels.left}
+            onToggle={() => setPanels((p) => ({ ...p, left: !p.left }))}
+            label="controls"
+            shortcut="["
+          />
+          <EdgeToggle
+            side="right"
+            open={panels.right}
+            onToggle={() => setPanels((p) => ({ ...p, right: !p.right }))}
+            label="Threat Matrix"
+            shortcut="]"
+          />
+        </div>
+
+        {inspectPoint && date && (
+          <div className="pointer-events-auto print:hidden">
+            <PixelInspector
+              lat={inspectPoint.lat}
+              lon={inspectPoint.lon}
+              date={date}
+              leadTime={leadTime}
+              variable={variable}
+              onClose={() => setInspectPoint(null)}
+            />
+          </div>
+        )}
+
+        {bulletinOpen && date && (
+          <div className="pointer-events-auto print:static print:w-full">
+            <BulletinModal
+              date={date}
+              leadTime={leadTime}
+              threats={threats}
+              onClose={() => setBulletinOpen(false)}
+            />
+          </div>
+        )}
 
         {dispatchOpen && threat && date && activeLang && (
-          <DispatchPreview
-            threat={threat}
-            text={alertText(threat, date, activeLang)}
-            speechLang={LANGUAGES[activeLang].speech}
-            onClose={() => setDispatchOpen(false)}
-          />
+          <div className="print:hidden">
+            <DispatchPreview
+              threat={threat}
+              text={alertText(threat, date, activeLang)}
+              speechLang={LANGUAGES[activeLang].speech}
+              onClose={() => setDispatchOpen(false)}
+            />
+          </div>
         )}
 
         {error && !meta.data && (
-          <div className="absolute inset-0 grid place-items-center p-4">
+          <div className="absolute inset-0 grid place-items-center p-4 print:hidden">
             <GlassPanel className="max-w-sm p-5 text-center">
               <p className="font-semibold text-white">Backend unreachable</p>
               <p className="mt-1 text-sm text-slate-400">
