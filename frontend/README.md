@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# Meghdrishti Frontend (React + TypeScript + Vite + Bun)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Command center for the SIH26081 Hybrid AI-NWP Super-Ensemble Blending System.
 
-Currently, two official plugins are available:
+## Development with Bun
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+# Install dependencies
+bun install
 
-## React Compiler
+# Start local dev server (http://localhost:5173)
+bun run dev
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# Build for production
+bun run build
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# Run Oxlint
+bun run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Features
+- Interactive Leaflet map with smooth Mercator raster layers (Rainfall, Temperature, Wind, XAI Trust).
+- IMD heavy rainfall alerts and Threat Matrix ranking.
+- Swipe comparison between raw GFS and blended forecast.
+- Multilingual automated disaster warnings with speech synthesis.
+- Guided Tour walkthrough mode.

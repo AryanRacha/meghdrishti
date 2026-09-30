@@ -31,5 +31,5 @@ This repository contains the codebase for SIH26081 (Ministry of Earth Sciences).
 2. **Communication Style**: Speak cleanly, strictly to the point, and professionally. NO YAPPING, no fluff, no long introductions or conclusions. Give direct technical answers and code.
 3. **Code Conventions**: Follow strict, modular software engineering practices. Keep files small and focused. Use type hinting in Python, TypeScript in React, and keep everything highly readable.
 4. **Data Size & OOM Prevention**: Weather grids are huge. Always crop spatial data to the Indian bounding box (Lat: 8 to 38, Lon: 68 to 98) during processing to prevent Out-Of-Memory errors.
-5. **Execution Paths**: Always run npm commands inside frontend/. Always run uvicorn inside backend/. Always run python ML scripts inside ml_pipeline/.
+5. **Execution Paths**: Always run bun commands inside frontend/. Always run uvicorn inside backend/. Always run python ML scripts inside ml_pipeline/.
 6. **The 'Winning Edge' (Context)**: The core differentiator for SIH26081 is preserving extreme weather events. Ensure the U-Net always utilizes the Custom Extreme Weighted Loss function rather than defaulting to standard MSE.

@@ -4,6 +4,10 @@ __pycache__/
 .env
 venv/
 .venv/
-data/
+/data/
+ml_pipeline/data/
 *.pth
 *.pt
+*.egg-info/
+dist/
+

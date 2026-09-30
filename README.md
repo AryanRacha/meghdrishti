@@ -63,7 +63,9 @@ Place the trained weights at `backend/weights/super_unet_blender_weights.pth` (g
 ```bash
 cd backend
 uv sync
-uv run uvicorn app.main:app --reload
+uv run dev       # Development server with auto-reload (http://127.0.0.1:8000)
+# uv run start   # Production server
+# uv run pytest  # Run backend test suite
 # or, without uv (Windows paths; use .venv/bin/ on Linux):
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt
@@ -76,7 +78,7 @@ API runs on `http://127.0.0.1:8000`. Swagger UI at `/docs`. See `docs/5-backend-
 ### 3. Frontend Dashboard
 ```bash
 cd frontend
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 Dashboard ("Meghdrishti") runs on `http://localhost:5173`. Click **▶ Guided Tour** for a ~2 minute walkthrough. See `docs/7-frontend-command-center.md` and `docs/8-command-center-features.md`.

@@ -104,6 +104,12 @@ backend/tests/                  # pytest
 ## Running
 ```bash
 cd backend
+uv sync
+uv run dev       # Development server with auto-reload (port 8000)
+# uv run start   # Production server
+# uv run pytest  # Pytest test suite
+
+# Without uv:
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt   # Windows; use .venv/bin/pip on Linux
 .venv/Scripts/pip install torch --index-url https://download.pytorch.org/whl/cpu

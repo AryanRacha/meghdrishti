@@ -43,3 +43,20 @@ def health_check() -> HealthResponse:
         weights=engine.weights_mode,
         device=str(engine.device),
     )
+
+
+def dev() -> None:
+    """Run local development server with auto-reload."""
+    import uvicorn
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+
+
+def start() -> None:
+    """Run production server."""
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False, workers=2)
+
+
+if __name__ == "__main__":
+    dev()
+
