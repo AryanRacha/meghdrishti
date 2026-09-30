@@ -1,0 +1,97 @@
+import { GlassPanel, PanelTitle } from '../ui/GlassPanel'
+import { LANGUAGES, alertText, languagesFor, type LangCode } from '../../lib/alerts'
+import { CATEGORY_LABELS, CATEGORY_STYLES, formatPeople } from '../../lib/format'
+import type { Threat } from '../../types/forecast'
+
+interface AlertCardProps {
+  threat: Threat
+  date: string
+  lang: LangCode
+  onLang: (lang: LangCode) => void
+  speaking: boolean
+  canSpeak: (speechLang: string) => boolean
+  onSpeak: (text: string, speechLang: string) => void
+  onStop: () => void
+  onDispatch: () => void
+  onClose: () => void
+}
+
+export function AlertCard(props: AlertCardProps) {
+  const { threat, date, lang, speaking } = props
+  const options = languagesFor(threat.state)
+  const active = options.includes(lang) ? lang : options[0]
+  const pack = LANGUAGES[active]
+  const text = alertText(threat, date, active)
+  const voiceAvailable = props.canSpeak(pack.speech)
+
+  return (
+    <GlassPanel as="section" label="Public warning" strong className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <PanelTitle>Public warning · Impact-based</PanelTitle>
+          <p className="mt-1 truncate text-sm font-semibold text-white">
+            {threat.district}, {threat.state}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ${CATEGORY_STYLES[threat.category]}`}>
+            {CATEGORY_LABELS[threat.category]}
+          </span>
+          <button
+            type="button"
+            onClick={props.onClose}
+            aria-label="Close warning"
+            className="rounded-md px-1.5 text-lg leading-none text-slate-400 hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div role="tablist" aria-label="Warning language" className="mt-3 flex flex-wrap gap-1.5">
+        {options.map((code) => (
+          <button
+            key={code}
+            type="button"
+            role="tab"
+            aria-selected={code === active}
+            onClick={() => props.onLang(code)}
+            className={`rounded-lg px-2.5 py-1 text-xs ring-1 transition-colors ${
+              code === active ? 'bg-cyan-400/15 text-cyan-100 ring-cyan-400/40' : 'text-slate-400 ring-white/10 hover:text-white'
+            }`}
+          >
+            {LANGUAGES[code].label}
+          </button>
+        ))}
+      </div>
+
+      <p lang={pack.speech} className="scrollbar-thin mt-3 max-h-32 overflow-y-auto text-[13px] leading-relaxed text-slate-200">
+        {text}
+      </p>
+
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+        <span className="text-xs text-slate-400">
+          <span className="font-semibold text-slate-200">{formatPeople(threat.population_exposed)}</span> people in affected area
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={!voiceAvailable && !speaking}
+            title={voiceAvailable ? undefined : `No ${pack.label} voice installed in this browser`}
+            onClick={() => (speaking ? props.onStop() : props.onSpeak(text, pack.speech))}
+            className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-100 ring-1 ring-white/15 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {speaking ? '■ Stop' : '🔊 Listen'}
+          </button>
+          <button
+            type="button"
+            onClick={props.onDispatch}
+            className="rounded-lg bg-red-500/90 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-red-900/40 hover:bg-red-500"
+          >
+            Dispatch alert
+          </button>
+        </div>
+      </div>
+    </GlassPanel>
+  )
+}

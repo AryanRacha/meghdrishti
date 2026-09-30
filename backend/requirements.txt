@@ -2,5 +2,12 @@ fastapi
 uvicorn
 pydantic
 pydantic-settings
+numpy
+scipy
 xarray
 netCDF4
+# torch: install the CPU wheel with
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch
+pytest
+httpx
