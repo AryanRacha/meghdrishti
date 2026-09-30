@@ -10,14 +10,16 @@ A Spatial Deep Learning (U-Net) Blending Engine that dynamically learns which fo
 - **The 'Winning Edge'**: ExtremeWeightedMSELoss implemented to heavily penalize missing high-rainfall events, balanced with Z-score normalizers.
 - **Training Loop**: Completed. GPU optimized with AMP, `num_workers=0`, and `cfgrib.open_datasets()` list-shattering. `unet_blender_weights.pth` successfully generated.
 
-## 3. Pending Phases (To Execute Next)
+## 3. Phase 3 (Completed)
 
-### Phase 3B: Backend Inference
-1. Build FastAPI endpoints (e.g., GET /api/v1/forecast/blended).
-2. Write logic to load the `.pth` weights, run the daily forecast grids through the U-Net, and output GeoJSON arrays.
+### Phase 3B: Backend Inference ✅
+FastAPI endpoints `meta`, `blended` (GeoJSON), `grid` (raster) and `alerts` (IMD-graded threats with population exposure and risk index). The model loads once at startup. See `docs/5-backend-inference.md`.
 
-### Phase 3C: Frontend Dashboard (No GPU Required)
-1. Build React UI with Leaflet.js.
-2. Create map layers for Base Models and Blended Output.
-3. Implement a time slider for forecast lead times (Day 1 to 5).
-4. Build the Extreme Weather Alerts sidebar.
+### Phase 3C: Frontend Dashboard ✅
+React + Leaflet "Meghdrishti" command center: GFS / AI / Blended / Trust layers, Day 1–5 lead-time slider, Threat Matrix sidebar. See `docs/7-frontend-command-center.md`.
+
+### Phase 3D: Presentation Features ✅
+Swipe compare, time-lapse, multilingual voice warnings, dispatch preview, Guided Tour, rain animation. See `docs/8-command-center-features.md`.
+
+## 4. Next Steps
+See "Known Issues / Next Steps" in `AGENTS.md`: GFS rain unit fix, realistic AI proxy, retraining, and a held-out evaluation script.

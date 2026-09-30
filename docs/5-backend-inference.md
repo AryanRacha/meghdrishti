@@ -30,7 +30,7 @@ The class docstring in `unet_blender.py` still describes an older 19-channel / 6
 
 ### 2. User & System Flow
 1. User opens the dashboard and selects a date, lead time, variable and layer.
-2. Frontend calls `GET /api/v1/forecast/blended?...` and `GET /api/v1/forecast/alerts?...`.
+2. Frontend calls `GET /api/v1/forecast/grid?...` (map raster) and `GET /api/v1/forecast/alerts?...`. External agencies use `GET /api/v1/forecast/blended` (GeoJSON).
 3. **Data acquisition** (`services/data_source.py`):
    - If `ml_pipeline/data/processed/{date}.pt` exists → load it (`data_source: "processed"`).
    - Otherwise → generate a deterministic synthetic scenario (`data_source: "synthetic"`), see below.
@@ -58,7 +58,8 @@ Every response carries `data_source` and `weights` (`"trained"` / `"untrained"`)
 |---|---|
 | `GET /health` | API status, model loaded, weights mode, device |
 | `GET /api/v1/forecast/meta` | Available dates, lead times, variables, layers, units |
-| `GET /api/v1/forecast/blended` | GeoJSON FeatureCollection for one layer |
+| `GET /api/v1/forecast/blended` | GeoJSON FeatureCollection for one layer (interoperability) |
+| `GET /api/v1/forecast/grid` | Full 128×128 grid as a flat row-major array (row 0 = north), ~28 KB gzipped; used by the dashboard |
 | `GET /api/v1/forecast/alerts` | Ranked extreme-rain threats (Threat Matrix) |
 
 ### `/blended` query parameters
@@ -72,6 +73,9 @@ Every response carries `data_source` and `weights` (`"trained"` / `"untrained"`)
 | `min_value` | none | drop cells below this value |
 
 Response: GeoJSON `FeatureCollection`, each feature a cell `Polygon` with `properties.v`, plus a foreign member `metadata` (`min`, `max`, `units`, `data_source`, `weights`, `lead_time_validated`, `cell_count`).
+
+### `/grid` response
+`{ metadata, lat_north, lat_south, lon_west, lon_east, rows, cols, values: number[] }`. Same `date`, `lead_time`, `variable`, `layer` parameters as `/blended`; temperature in °C.
 
 ### `/alerts` response
 `{ metadata, threats: [{ id, district, state, distance_km, lat, lon, peak_mm, mean_mm, area_km2, category, severity_rank, gfs_mm, ai_mm, gfs_trust, population_exposed, risk_index }] }`
