@@ -31,14 +31,14 @@ function hexToRgb(hex: string): RGB {
 
 const css = (rgb: RGB) => `rgb(${rgb.map(Math.round).join(',')})`
 
-// IMD 24 h rainfall categories (mm). Red is reserved for Extremely Heavy.
+// IMD 24 h rainfall categories (mm) with vibrant, luminous radar hues
 const RAIN_BINS: Bin[] = [
-  { min: 1, color: '#a5f3fc', label: 'Very light' },
-  { min: 2.5, color: '#38bdf8', label: 'Light' },
+  { min: 1, color: '#38bdf8', label: 'Very light' },
+  { min: 2.5, color: '#0ea5e9', label: 'Light' },
   { min: 15.6, color: '#2563eb', label: 'Moderate' },
   { min: 64.5, color: '#facc15', label: 'Heavy' },
   { min: 115.6, color: '#f97316', label: 'Very heavy' },
-  { min: 204.5, color: '#dc2626', label: 'Extremely heavy' },
+  { min: 204.5, color: '#ef4444', label: 'Extremely heavy' },
 ]
 
 const RAIN_RGB = RAIN_BINS.map((b) => hexToRgb(b.color))
@@ -50,8 +50,8 @@ const RAIN: Scale = {
     for (let i = RAIN_BINS.length - 1; i >= 0; i--) if (v >= RAIN_BINS[i].min) return RAIN_RGB[i]
     return null
   },
-  // Light rain fades into the basemap; heavy rain is near-opaque
-  alpha: (v) => (v < 1 ? 0 : v < 15.6 ? 0.35 + ((v - 1) / 14.6) * 0.3 : v < 64.5 ? 0.7 : 0.88),
+  // Vibrant radar precipitation gradient: luminous and punchy
+  alpha: (v) => (v < 1 ? 0 : v < 15.6 ? 0.45 + ((v - 1) / 14.6) * 0.28 : v < 64.5 ? 0.78 : 0.88),
 }
 
 function continuous(stops: Stop[], minLabel: string, maxLabel: string, opacity: number): Scale {
@@ -80,7 +80,7 @@ const TEMP = continuous(
   ],
   '10 °C',
   '42 °C',
-  0.62,
+  0.55,
 )
 
 const WIND = continuous(
@@ -92,7 +92,7 @@ const WIND = continuous(
   ],
   '0 m/s',
   '20 m/s',
-  0.62,
+  0.55,
 )
 
 // XAI trust map: 0 = trust AI (violet), 1 = trust GFS (teal)
@@ -104,7 +104,7 @@ const TRUST = continuous(
   ],
   'Trust AI',
   'Trust GFS',
-  0.6,
+  0.55,
 )
 
 export function scaleFor(variable: Variable, layer: Layer): Scale {

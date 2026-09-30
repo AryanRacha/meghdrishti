@@ -51,10 +51,10 @@ const PENALTIES: [string, string][] = [
 ]
 
 const CONTENT: Record<StoryPanelId, ReactNode> = {
-  intro: (
+    intro: (
     <>
       <Brand />
-      <p className="mt-4 text-center text-base text-slate-300">Hybrid AI-NWP forecast blending for extreme rainfall over India</p>
+      <p className="mt-4 text-center text-base font-medium text-slate-200">AI-NWP Weather Forecast Blending for India</p>
       <Chips items={['Physics + AI super-ensemble', 'Explainable Trust Maps', 'IMD-graded threats', 'Last-mile multilingual alerts']} />
       <p className="mt-6 text-center text-xs tracking-widest text-slate-500 uppercase">SIH26081 · Ministry of Earth Sciences</p>
     </>

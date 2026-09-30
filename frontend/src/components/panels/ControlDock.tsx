@@ -1,6 +1,7 @@
+import { DateDropdown } from '../ui/DateDropdown'
 import { GlassPanel, PanelTitle } from '../ui/GlassPanel'
 import { Segmented } from '../ui/Segmented'
-import { LAYER_LABELS, VARIABLE_LABELS, formatDate, leadTimeLabel } from '../../lib/format'
+import { LAYER_LABELS, VARIABLE_LABELS, leadTimeLabel } from '../../lib/format'
 import type { Layer, Variable } from '../../types/forecast'
 
 const VARIABLES: readonly Variable[] = ['rain', 'temp', 'wind']
@@ -81,18 +82,7 @@ export function ControlDock(props: ControlDockProps) {
       <div className="space-y-2">
         <PanelTitle>Forecast date</PanelTitle>
         <div className="flex gap-2">
-          <select
-            aria-label="Forecast date"
-            value={date}
-            onChange={(e) => onDate(e.target.value)}
-            className="min-w-0 flex-1 rounded-xl bg-white/5 px-3 py-2 text-sm text-slate-100 ring-1 ring-white/10 outline-none focus-visible:ring-cyan-400/60"
-          >
-            {dates.map((d) => (
-              <option key={d} value={d} className="bg-slate-900">
-                {formatDate(d)}
-              </option>
-            ))}
-          </select>
+          <DateDropdown dates={dates} date={date} onDate={onDate} />
           <button
             type="button"
             onClick={() => props.onPlaying(!props.playing)}

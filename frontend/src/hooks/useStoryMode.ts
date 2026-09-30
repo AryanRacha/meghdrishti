@@ -12,11 +12,13 @@ export interface StoryCaption {
 
 class Cancelled extends Error {}
 
+type NavigationDirection = 'next' | 'prev'
+
 export function useStoryMode(controls: StoryControls) {
   const controlsRef = useRef(controls)
   const runId = useRef(0)
   const stepIdRef = useRef(0)
-  const nextResolver = useRef<(() => void) | null>(null)
+  const stepResolver = useRef<((dir: NavigationDirection) => void) | null>(null)
   const savedPanels = useRef<Panels | null>(null)
   const [caption, setCaption] = useState<StoryCaption | null>(null)
 
@@ -31,24 +33,34 @@ export function useStoryMode(controls: StoryControls) {
 
   const stop = useCallback(() => {
     runId.current += 1
-    if (nextResolver.current) {
-      nextResolver.current()
-      nextResolver.current = null
+    if (stepResolver.current) {
+      stepResolver.current('next')
+      stepResolver.current = null
     }
     controlsRef.current.stopSpeech()
     controlsRef.current.setPlaying(false)
     controlsRef.current.setCompare(false)
     controlsRef.current.setDispatch(false)
+    controlsRef.current.setBulletin(false)
+    controlsRef.current.setInspectPoint(null)
     controlsRef.current.selectThreat(null)
     restorePanels()
     setCaption(null)
   }, [restorePanels])
 
   const next = useCallback(() => {
-    if (nextResolver.current) {
-      const resolve = nextResolver.current
-      nextResolver.current = null
-      resolve()
+    if (stepResolver.current) {
+      const resolve = stepResolver.current
+      stepResolver.current = null
+      resolve('next')
+    }
+  }, [])
+
+  const prev = useCallback(() => {
+    if (stepResolver.current) {
+      const resolve = stepResolver.current
+      stepResolver.current = null
+      resolve('prev')
     }
   }, [])
 
@@ -61,8 +73,10 @@ export function useStoryMode(controls: StoryControls) {
     const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)).then(guard)
 
     try {
-      for (let i = 0; i < STORY.length; i++) {
-        const step = STORY[i]
+      let currentIndex = 0
+
+      while (currentIndex < STORY.length) {
+        const step = STORY[currentIndex]
         const stepId = ++stepIdRef.current
         const stepGuard = () => {
           guard()
@@ -83,27 +97,44 @@ export function useStoryMode(controls: StoryControls) {
             requestAnimationFrame(tick)
           })
 
-        // Stop in-flight speech before moving to the next step
+        // Stop in-flight speech before moving to the next or previous step
         controlsRef.current.stopSpeech()
 
-        // Let state from the previous step (date, selection, fetched threats) propagate before reading it
+        // Let state from the previous step propagate
         await wait(80)
         guard()
 
         const c = controlsRef.current
         c.setPanels(step.panels ?? PANELS_HIDDEN)
-        setCaption({ index: i, total: STORY.length, title: step.title, text: step.text(c), durationMs: step.durationMs, panel: step.panel })
+        setCaption({
+          index: currentIndex,
+          total: STORY.length,
+          title: step.title,
+          text: step.text(c),
+          durationMs: step.durationMs,
+          panel: step.panel,
+        })
 
         // Trigger step's visual action/animations
         if (step.run) {
           step.run(c, { animate: stepAnimate, wait: stepWait })
         }
 
-        // Wait for Enter key to advance to the next step
-        await new Promise<void>((resolve) => {
-          nextResolver.current = resolve
-        }).then(guard)
+        // Wait for keyboard or button navigation
+        const direction = await new Promise<NavigationDirection>((resolve) => {
+          stepResolver.current = resolve
+        }).then((dir) => {
+          guard()
+          return dir
+        })
+
+        if (direction === 'prev') {
+          currentIndex = Math.max(0, currentIndex - 1)
+        } else {
+          currentIndex++
+        }
       }
+
       restorePanels()
       setCaption(null)
     } catch (err) {
@@ -119,14 +150,17 @@ export function useStoryMode(controls: StoryControls) {
       if (e.key === 'Escape') {
         e.preventDefault()
         stop()
-      } else if (e.key === 'Enter') {
+      } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault()
         next()
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        prev()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [caption, stop, next])
+  }, [caption, stop, next, prev])
 
-  return { caption, start, stop, next, active: caption !== null }
+  return { caption, start, stop, next, prev, active: caption !== null }
 }

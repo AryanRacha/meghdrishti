@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { alertsUrl, gridUrl, metaUrl, prefetch } from './api/client'
 import { ForecastMap } from './components/map/ForecastMap'
 import { MapController } from './components/map/MapController'
-import { RainAnimation } from './components/map/RainAnimation'
 import { RasterLayer } from './components/map/RasterLayer'
 import { SwipeCompare } from './components/map/SwipeCompare'
 import { SwipeDivider } from './components/map/SwipeDivider'
@@ -69,7 +68,7 @@ function App() {
   const layerMeta = shown?.metadata
   const scale = useMemo(() => (layerMeta ? scaleFor(layerMeta.variable, layerMeta.layer) : null), [layerMeta])
 
-  const threats = alerts.data?.threats ?? []
+  const threats = useMemo(() => alerts.data?.threats ?? [], [alerts.data?.threats])
   const threat = threats.find((t) => t.id === selectedThreat) ?? null
   const activeLang = threat ? (lang && languagesFor(threat.state).includes(lang) ? lang : languagesFor(threat.state)[0]) : null
   const loading = (compare ? left.loading || right.loading : single.loading) || alerts.loading
@@ -77,10 +76,19 @@ function App() {
 
   const speech = useSpeech()
 
-  const selectThreat = useCallback((id: string | null) => {
-    setSelectedThreat(id)
-    setLang(null)
-  }, [])
+  const selectThreat = useCallback(
+    (id: string | null) => {
+      setSelectedThreat(id)
+      setLang(null)
+      if (id) {
+        const match = threats.find((t) => t.id === id)
+        if (match) {
+          setInspectPoint({ lat: match.lat, lon: match.lon })
+        }
+      }
+    },
+    [threats],
+  )
 
   // Time-lapse: advance one day once the current frame is on screen, prefetching the next
   useEffect(() => {
@@ -119,11 +127,20 @@ function App() {
     selectThreat,
     setLang,
     setDispatch: setDispatchOpen,
+    setBulletin: setBulletinOpen,
+    setInspectPoint,
     setPlaying,
     resetView: () => setResetKey((k) => k + 1),
     speak: speech.speak,
     stopSpeech: speech.stop,
   })
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tour')) {
+      story.start()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <main className={`relative h-full w-full overflow-hidden ${panels.right ? 'right-open' : ''} print:h-auto print:overflow-visible`}>
@@ -132,9 +149,6 @@ function App() {
           <SwipeCompare left={left.data} right={right.data} scale={scale} position={swipe} />
         ) : (
           !compare && single.data && scale && <RasterLayer grid={single.data} scale={scale} />
-        )}
-        {!compare && single.data?.metadata.variable === 'rain' && single.data.metadata.layer !== 'trust' && (
-          <RainAnimation grid={single.data} />
         )}
         <ThreatMarkers threats={threats} selectedId={selectedThreat} onSelect={selectThreat} />
         {inspectPoint && (
@@ -155,7 +169,7 @@ function App() {
 
       {/* Floating UI layer (above Leaflet panes/controls) */}
       <div className="pointer-events-none absolute inset-0 z-[1100] print:static print:inset-auto print:h-auto print:w-full print:overflow-visible">
-        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] flex-col gap-3 sm:w-80 print:hidden">
+        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-80 print:hidden">
           <Header
             run={alerts.data?.metadata ?? null}
             loading={loading}
@@ -193,8 +207,8 @@ function App() {
         )}
 
         {story.caption && (
-          <div className="absolute top-4 left-1/2 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 print:hidden">
-            <StoryBar caption={story.caption} onNext={story.next} onStop={story.stop} />
+          <div className="absolute top-4 left-1/2 w-[min(38rem,calc(100%-2rem))] -translate-x-1/2 print:hidden">
+            <StoryBar caption={story.caption} onNext={story.next} onPrev={story.prev} onStop={story.stop} />
           </div>
         )}
 
@@ -204,23 +218,41 @@ function App() {
           </div>
         )}
 
-        {threat && date && activeLang && (
+        {(Boolean(threat && date && activeLang) || Boolean(inspectPoint && date)) && (
           <div
-            className={`absolute inset-x-4 bottom-20 transition-[left,right] duration-500 lg:bottom-4 ${panels.left ? 'lg:left-[22rem]' : 'lg:left-72'} ${panels.right ? 'lg:right-[26rem]' : 'lg:right-4'} print:hidden`}
+            className={`pointer-events-none absolute bottom-4 inset-x-4 transition-[left,right] duration-500 z-[950] print:hidden ${
+              panels.left ? 'lg:left-[21.5rem]' : 'lg:left-4'
+            } ${panels.right ? 'lg:right-[25.5rem]' : 'lg:right-4'}`}
           >
-            <div className="appear mx-auto max-w-xl">
-              <AlertCard
-                threat={threat}
-                date={date}
-                lang={activeLang}
-                onLang={setLang}
-                speaking={speech.speaking}
-                canSpeak={speech.canSpeak}
-                onSpeak={(text, speechLang) => void speech.speak(text, speechLang)}
-                onStop={speech.stop}
-                onDispatch={() => setDispatchOpen(true)}
-                onClose={() => selectThreat(null)}
-              />
+            <div className="flex items-end justify-center gap-3.5 flex-wrap xl:flex-nowrap">
+              {threat && date && activeLang && (
+                <div className="pointer-events-auto w-full max-w-lg min-w-0 appear">
+                  <AlertCard
+                    threat={threat}
+                    date={date}
+                    lang={activeLang}
+                    onLang={setLang}
+                    speaking={speech.speaking}
+                    canSpeak={speech.canSpeak}
+                    onSpeak={(text, speechLang) => void speech.speak(text, speechLang)}
+                    onStop={speech.stop}
+                    onDispatch={() => setDispatchOpen(true)}
+                    onClose={() => selectThreat(null)}
+                  />
+                </div>
+              )}
+              {inspectPoint && date && (
+                <div className="pointer-events-auto w-full sm:w-84 shrink-0 appear">
+                  <PixelInspector
+                    lat={inspectPoint.lat}
+                    lon={inspectPoint.lon}
+                    date={date}
+                    leadTime={leadTime}
+                    variable={variable}
+                    onClose={() => setInspectPoint(null)}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -253,19 +285,6 @@ function App() {
             shortcut="]"
           />
         </div>
-
-        {inspectPoint && date && (
-          <div className="pointer-events-auto print:hidden">
-            <PixelInspector
-              lat={inspectPoint.lat}
-              lon={inspectPoint.lon}
-              date={date}
-              leadTime={leadTime}
-              variable={variable}
-              onClose={() => setInspectPoint(null)}
-            />
-          </div>
-        )}
 
         {bulletinOpen && date && (
           <div className="pointer-events-auto print:static print:w-full">

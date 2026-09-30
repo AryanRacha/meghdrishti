@@ -29,6 +29,8 @@ export interface StoryControls {
   selectThreat: (id: string | null) => void
   setLang: (l: LangCode) => void
   setDispatch: (open: boolean) => void
+  setBulletin: (open: boolean) => void
+  setInspectPoint: (pt: { lat: number; lon: number } | null) => void
   setPlaying: (on: boolean) => void
   resetView: () => void
   speak: (text: string, speechLang: string) => Promise<void>
@@ -63,6 +65,8 @@ const pick = (c: StoryControls, d: string) => (c.dates.includes(d) ? d : (c.date
 function resetMap(c: StoryControls) {
   c.setPlaying(false)
   c.setDispatch(false)
+  c.setBulletin(false)
+  c.setInspectPoint(null)
   c.selectThreat(null)
   c.setCompare(false)
   c.setLeadTime(24)
@@ -74,7 +78,7 @@ export const STORY: Step[] = [
   // --- Act 1: context -------------------------------------------------------
   {
     title: 'Meghdrishti · मेघदृष्टि',
-    text: () => 'Hybrid AI-NWP forecast blending for extreme rainfall. SIH26081 · Ministry of Earth Sciences',
+    text: () => 'AI-NWP weather forecast blending and disaster decision support. SIH26081 · Ministry of Earth Sciences',
     durationMs: 6000,
     panel: 'intro',
     run: (c) => {
@@ -88,18 +92,33 @@ export const STORY: Step[] = [
     text: () => 'Physics models miss local extremes; AI models smooth them; plain averaging dilutes both.',
     durationMs: 8000,
     panel: 'problem',
+    run: (c) => {
+      resetMap(c)
+      c.setDate(pick(c, TOUR_DATE))
+      c.setLayer('blended')
+    },
   },
   {
     title: 'Super-UNet architecture',
     text: () => '7 input channels → residual U-Net with FiLM lead-time conditioning → 3 per-pixel trust heads.',
     durationMs: 9500,
     panel: 'architecture',
+    run: (c) => {
+      resetMap(c)
+      c.setDate(pick(c, TOUR_DATE))
+      c.setLayer('blended')
+    },
   },
   {
     title: 'Extreme-weighted loss',
     text: () => 'Missing a cloudburst costs exponentially more than missing a drizzle.',
     durationMs: 7000,
     panel: 'loss',
+    run: (c) => {
+      resetMap(c)
+      c.setDate(pick(c, TOUR_DATE))
+      c.setLayer('blended')
+    },
   },
 
   // --- Act 2: the forecast ---------------------------------------------------
@@ -107,25 +126,39 @@ export const STORY: Step[] = [
     title: 'Input 1 · NOAA GFS',
     text: () => 'Physics-based global model at 0.25°, cropped to India (8–38°N, 68–98°E).',
     durationMs: 4500,
-    run: (c) => c.setLayer('gfs'),
+    run: (c) => {
+      c.setCompare(false)
+      c.setVariable('rain')
+      c.setLayer('gfs')
+    },
   },
   {
     title: 'Input 2 · AI forecast',
     text: () => 'Data-driven AI model for the same day: fast, but tends to smooth extremes.',
     durationMs: 4500,
-    run: (c) => c.setLayer('ai'),
+    run: (c) => {
+      c.setCompare(false)
+      c.setVariable('rain')
+      c.setLayer('ai')
+    },
   },
   {
     title: 'Output · Super-UNet blend',
     text: () => 'Every ~26 km cell gets its own GFS/AI mix, learned from ERA5 ground truth.',
     durationMs: 4500,
-    run: (c) => c.setLayer('blended'),
+    run: (c) => {
+      c.setCompare(false)
+      c.setVariable('rain')
+      c.setLayer('blended')
+    },
   },
   {
     title: 'Side by side',
     text: () => 'Raw GFS on the left, the Super-UNet blend on the right.',
     durationMs: 8500,
     run: async (c, t) => {
+      c.setInspectPoint(null)
+      c.setVariable('rain')
       c.setSwipe(0.85)
       c.setCompare(true)
       await t.animate(0.85, 0.22, 3500, c.setSwipe)
@@ -138,7 +171,20 @@ export const STORY: Step[] = [
     durationMs: 6000,
     run: (c) => {
       c.setCompare(false)
+      c.setInspectPoint(null)
+      c.setVariable('rain')
       c.setLayer('trust')
+    },
+  },
+  {
+    title: 'XAI · Pixel Inspector',
+    text: () => 'Sample any ~26 km cell to see the mathematical blending equation and per-model trust weights.',
+    durationMs: 7000,
+    run: (c) => {
+      c.setCompare(false)
+      c.setLayer('trust')
+      c.setVariable('rain')
+      c.setInspectPoint({ lat: 31.7, lon: 77.0 })
     },
   },
   {
@@ -146,6 +192,7 @@ export const STORY: Step[] = [
     text: () => 'Each variable has its own trust head and its own blended field.',
     durationMs: 7500,
     run: async (c, t) => {
+      c.setInspectPoint(null)
       c.setVariable('temp')
       await t.wait(2500)
       c.setLayer('blended')
@@ -159,6 +206,8 @@ export const STORY: Step[] = [
     durationMs: 6500,
     panels: CONTROLS,
     run: async (c, t) => {
+      c.setInspectPoint(null)
+      c.setLayer('blended')
       c.setVariable('rain')
       for (const h of [48, 72, 96, 120]) {
         await t.wait(1300)
@@ -172,6 +221,7 @@ export const STORY: Step[] = [
     durationMs: 9000,
     panels: CONTROLS,
     run: async (c, t) => {
+      c.setVariable('rain')
       c.setLeadTime(24)
       c.setDate(pick(c, TIMELAPSE_START))
       await t.wait(800)
@@ -188,6 +238,13 @@ export const STORY: Step[] = [
     text: (c) => `${c.threats.length} IMD heavy-rain regions (≥ 64.5 mm) auto-detected and ranked by severity.`,
     durationMs: 5000,
     panels: THREATS,
+    run: (c) => {
+      c.setPlaying(false)
+      c.setVariable('rain')
+      c.setLeadTime(24)
+      c.setDate(pick(c, TOUR_DATE))
+      c.selectThreat(null)
+    },
   },
   {
     title: 'Threat #1',
@@ -199,7 +256,13 @@ export const STORY: Step[] = [
     },
     durationMs: 5000,
     panels: THREATS,
-    run: (c) => c.selectThreat(top(c)?.id ?? null),
+    run: (c) => {
+      c.setPlaying(false)
+      c.setVariable('rain')
+      c.setLeadTime(24)
+      c.setDate(pick(c, TOUR_DATE))
+      c.selectThreat(top(c)?.id ?? null)
+    },
   },
   {
     title: 'Impact-based forecasting',
@@ -209,12 +272,16 @@ export const STORY: Step[] = [
     },
     durationMs: 5000,
     panels: THREATS,
+    run: (c) => {
+      c.selectThreat(top(c)?.id ?? null)
+    },
   },
   {
     title: 'Last-mile warning',
     text: (c) => `Auto-generated public warning in ${LANGUAGES[regional(top(c))].label}, read aloud.`,
     durationMs: 7000,
     run: async (c) => {
+      c.selectThreat(top(c)?.id ?? null)
       const t = top(c)
       if (!t || !c.date) return
       const lang = regional(t)
@@ -227,6 +294,8 @@ export const STORY: Step[] = [
     text: () => 'Hindi, English and the state language: Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam and more.',
     durationMs: 5000,
     run: async (c, t) => {
+      c.selectThreat(top(c)?.id ?? null)
+      c.setDispatch(false)
       c.setLang('hi')
       await t.wait(2500)
       c.setLang('en')
@@ -236,7 +305,20 @@ export const STORY: Step[] = [
     title: 'Dispatch',
     text: () => 'One click to Cell Broadcast, SMS, WhatsApp and the District Control Room.',
     durationMs: 6500,
-    run: (c) => c.setDispatch(true),
+    run: (c) => {
+      c.selectThreat(top(c)?.id ?? null)
+      c.setBulletin(false)
+      c.setDispatch(true)
+    },
+  },
+  {
+    title: 'Official IMD Civil Bulletin',
+    text: () => 'One-click official impact-based disaster advisory with NDMA protocols and print-ready PDF export.',
+    durationMs: 7500,
+    run: (c) => {
+      c.setDispatch(false)
+      c.setBulletin(true)
+    },
   },
   // --- Close -------------------------------------------------------------------
   {
@@ -245,6 +327,7 @@ export const STORY: Step[] = [
     durationMs: 7000,
     panel: 'outro',
     run: (c) => {
+      c.setBulletin(false)
       c.setDispatch(false)
       c.selectThreat(null)
       c.setLayer('blended')

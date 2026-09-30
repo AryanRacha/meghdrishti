@@ -4,10 +4,12 @@ import { GlassPanel } from '../ui/GlassPanel'
 export function StoryBar({
   caption,
   onNext,
+  onPrev,
   onStop,
 }: {
   caption: StoryCaption
   onNext: () => void
+  onPrev: () => void
   onStop: () => void
 }) {
   return (
@@ -23,18 +25,29 @@ export function StoryBar({
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
+            onClick={onPrev}
+            disabled={caption.index === 0}
+            title="Previous step (Left Arrow ←)"
+            className="flex items-center gap-1 rounded-md bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-300 ring-1 ring-white/10 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-30 cursor-pointer"
+          >
+            <span aria-hidden>‹</span>
+            <span>Back</span>
+          </button>
+          <button
+            type="button"
             onClick={onNext}
-            title="Next step (Enter)"
-            className="flex items-center gap-1 rounded-md bg-cyan-500/20 px-2.5 py-1 text-xs font-medium text-cyan-200 ring-1 ring-cyan-400/40 hover:bg-cyan-500/30"
+            title="Next step (Right Arrow → or Enter ↵)"
+            className="flex items-center gap-1 rounded-md bg-cyan-500/20 px-3 py-1 text-xs font-medium text-cyan-200 ring-1 ring-cyan-400/40 transition-colors hover:bg-cyan-500/30 cursor-pointer"
           >
             <span>{caption.index === caption.total - 1 ? 'Finish' : 'Next'}</span>
-            <kbd className="font-mono text-[10px] text-cyan-300">↵</kbd>
+            <span aria-hidden>›</span>
           </button>
           <button
             type="button"
             onClick={onStop}
-            aria-label="Stop guided tour"
-            className="rounded-md px-2 py-1 text-xs text-slate-400 ring-1 ring-white/10 hover:text-white"
+            aria-label="Stop guided tour (Esc)"
+            title="Stop tour (Esc)"
+            className="rounded-md px-2.5 py-1 text-xs text-slate-400 ring-1 ring-white/10 transition-colors hover:text-white cursor-pointer"
           >
             Esc
           </button>

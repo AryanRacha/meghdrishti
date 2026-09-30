@@ -65,7 +65,7 @@ export function PixelInspector({ lat, lon, date, leadTime, variable, onClose }: 
       as="aside"
       label="XAI Pixel Inspector"
       strong
-      className="absolute bottom-20 left-4 z-[950] w-84 p-4 shadow-2xl transition-all sm:bottom-6 sm:left-auto sm:right-104"
+      className="w-full p-4 shadow-2xl transition-all"
     >
       <div className="flex items-start justify-between gap-2 border-b border-white/10 pb-2.5">
         <div>
