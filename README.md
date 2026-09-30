@@ -59,12 +59,19 @@ uv run python train.py
 *Note: Ensure your Copernicus API key is placed in `~/.cdsapirc` if downloading new ERA5 data.*
 
 ### 2. Backend API
+Place the trained weights at `backend/weights/super_unet_blender_weights.pth` (git-ignored).
 ```bash
 cd backend
 uv sync
 uv run uvicorn app.main:app --reload
+# or, without uv (Windows paths; use .venv/bin/ on Linux):
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt
+.venv/Scripts/pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv/Scripts/python -m uvicorn app.main:app --port 8000
+.venv/Scripts/python -m pytest
 ```
-API runs on `http://127.0.0.1:8000`. Swagger UI at `/docs`.
+API runs on `http://127.0.0.1:8000`. Swagger UI at `/docs`. See `docs/5-backend-inference.md`.
 
 ### 3. Frontend Dashboard
 ```bash
@@ -72,4 +79,4 @@ cd frontend
 npm install
 npm run dev
 ```
-Dashboard runs on `http://localhost:5173`.
+Dashboard ("Meghdrishti") runs on `http://localhost:5173`. Click **▶ Guided Tour** for a ~2 minute walkthrough. See `docs/7-frontend-command-center.md` and `docs/8-command-center-features.md`.

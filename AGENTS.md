@@ -11,15 +11,19 @@ This repository contains the codebase for SIH26081 (Ministry of Earth Sciences).
 ## Directory Structure
 - docs/ -> Contains modular documentation of implemented tasks.
 - backend/ -> FastAPI server.
-- brontend/ -> React UI dashboard.
+- frontend/ -> React UI dashboard.
 - ml_pipeline/ -> PyTorch models, data fetchers, and training loops.
 - data/ -> Local storage for raw and processed weather grids.
 
 ## Current Project Status
-- **DONE**: Monorepo scaffolding, FastAPI setup, GFS & ERA5 data fetchers, U-Net model, Custom Loss function, and PyTorch training loop.
-- **PENDING / NEXT STEPS**:
-  1. Build the React Frontend (Map components, UI layout).
-  2. Integrate backend API to serve the saved model weights (unet_blender_weights.pth) and blended .nc outputs to the frontend.
+- **DONE**: Monorepo scaffolding, GFS & ERA5 data fetchers, Super-UNet model, custom loss, training loop (500 epochs).
+- **DONE (Phase 3B)**: FastAPI inference API serving `backend/weights/super_unet_blender_weights.pth` (git-ignored). See `docs/5-backend-inference.md`.
+- **DONE (Phase 3C/3D)**: "Meghdrishti" React/Leaflet command center. See `docs/7-frontend-command-center.md` and `docs/8-command-center-features.md`.
+- **KNOWN ISSUES / NEXT STEPS**:
+  1. `ml_pipeline/preprocess.py` multiplies GFS `tp` by 1000, but GFS precipitation is already kg/m² (= mm). GFS rain is 1000× too large, so the model learned to ignore GFS for rain. Fix, re-preprocess, retrain.
+  2. The synthetic AI proxy (`ai_fetcher.py`) is ERA5 × 0.9 + small noise (no blur), so it leaks the target. Add blur and weaken extremes.
+  3. `ml_pipeline/evaluate.py` imports a class that no longer exists (`UNetBlender`). Rewrite it to report RMSE/MAE and POD/FAR/CSI on held-out September 2023.
+  4. Without `ml_pipeline/data/processed/*.pt`, the backend serves deterministic generated scenarios (`data_source: "synthetic"` in API metadata).
 
 ## Critical Rules for AI Agents (MUST FOLLOW)
 

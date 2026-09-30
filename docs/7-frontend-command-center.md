@@ -18,12 +18,13 @@ Full-screen map with floating glassmorphism panels:
 
 ## Data Flow
 1. `GET /api/v1/forecast/meta` on load → dates, lead times, trained lead times.
-2. On any control change → `GET /api/v1/forecast/blended?...` (rain adds `min_value=1` to drop dry cells) and `GET /api/v1/forecast/alerts?...`.
-3. Requests are aborted when superseded; previous data stays on screen while loading.
+2. On any control change → `GET /api/v1/forecast/grid?...` and `GET /api/v1/forecast/alerts?...`.
+3. Superseded responses are ignored; previous data stays on screen while loading. `api/client.ts` keeps an LRU cache (60 responses) so toggles and playback frames are instant after first load.
 4. Vite dev server proxies `/api` and `/health` to `http://localhost:8000`.
 
 ## Rendering
-- GeoJSON cells drawn imperatively with `L.geoJSON` on a shared **canvas renderer** (thousands of SVG paths would lag).
+- The grid is rasterised in the browser (`lib/rasterize.ts`): resampled to Web Mercator (1400 px wide), bilinearly interpolated, **then** coloured, so IMD category contours stay crisp. Dry cells (< 1 mm) are transparent and the grid edges are feathered. Shown as a Leaflet `ImageOverlay` (`RasterLayer.tsx`).
+- Rain gets an animated streak overlay (`RainAnimation.tsx`). Details in `8-command-center-features.md`.
 - Color scales (`src/lib/colorScales.ts`):
   - Rain: IMD 24 h bins; red is reserved for Extremely Heavy.
   - Temp: blue → yellow → red, 10–40 °C.
@@ -36,18 +37,32 @@ frontend/src/
   App.tsx                         # state + composition
   types/forecast.ts               # API types (mirror backend/app/schemas)
   api/client.ts                   # URL builders + fetch
-  hooks/useApi.ts                 # abortable fetch hook
-  lib/colorScales.ts              # scales + legend stops
+  hooks/useApi.ts                 # fetch hook (ignores superseded responses)
+  hooks/useSpeech.ts              # speechSynthesis wrapper
+  hooks/useStoryMode.ts           # Guided Tour runner
+  lib/colorScales.ts              # RGB scales + legend stops
+  lib/rasterize.ts                # grid -> smooth Mercator PNG
+  lib/alerts.ts                   # multilingual warning templates
+  lib/storyScript.ts              # Guided Tour steps
   lib/format.ts                   # labels / number formatting
   components/ui/GlassPanel.tsx    # shared glass container
   components/ui/Segmented.tsx     # segmented toggle
+  components/ui/EdgeToggle.tsx    # sidebar show/hide tab
   components/map/ForecastMap.tsx  # map shell, basemap, bounds
-  components/map/HeatmapLayer.tsx # canvas GeoJSON layer + hover tooltip
+  components/map/RasterLayer.tsx  # smooth raster overlay + hover tooltip
+  components/map/RainAnimation.tsx# rain streak canvas
+  components/map/SwipeCompare.tsx # GFS vs blend clipped panes
+  components/map/SwipeDivider.tsx # draggable divider
+  components/map/MapController.tsx# reset-view fly-to
   components/map/ThreatMarkers.tsx# threat rings + selected pulse + flyTo
   components/panels/Header.tsx
   components/panels/ControlDock.tsx
   components/panels/Legend.tsx
   components/panels/ThreatMatrix.tsx
+  components/panels/AlertCard.tsx
+  components/panels/DispatchPreview.tsx
+  components/panels/StoryBar.tsx
+  components/panels/StoryPanel.tsx
 ```
 
 ## Running
@@ -56,5 +71,5 @@ cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000
 cd frontend && npm run dev   # http://localhost:5173
 ```
 
-## Deferred (Phase 3D)
-Swipe comparison slider, vulnerability/population overlay, GenAI briefing.
+## Phase 3D
+Swipe compare, time-lapse, impact estimates, multilingual voice warnings, dispatch preview, Guided Tour, rain animation and collapsible sidebars are built. See `8-command-center-features.md`. Still deferred: GenAI (LLM) briefing.
