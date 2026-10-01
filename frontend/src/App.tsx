@@ -61,7 +61,7 @@ function App() {
   const single = useApi<ForecastGrid>(compare ? null : query(layer))
   const left = useApi<ForecastGrid>(compare ? query('gfs') : null)
   const right = useApi<ForecastGrid>(compare ? query('blended') : null)
-  const alerts = useApi<AlertsResponse>(date ? alertsUrl({ date, leadTime }) : null)
+  const alerts = useApi<AlertsResponse>(date ? alertsUrl({ date, leadTime, variable }) : null)
 
   // Colour by what the data *is*, not what is selected, so stale data is never mis-coloured mid-fetch
   const shown = compare ? right.data : single.data
@@ -96,7 +96,7 @@ function App() {
     const next = dates[(dates.indexOf(date) + 1) % dates.length]
     const nextLayers: Layer[] = compare ? ['gfs', 'blended'] : [layer]
     nextLayers.forEach((l) => prefetch(gridUrl({ date: next, leadTime, variable, layer: l })))
-    prefetch(alertsUrl({ date: next, leadTime }))
+    prefetch(alertsUrl({ date: next, leadTime, variable }))
     const timer = setTimeout(() => setPickedDate(next), PLAYBACK_FRAME_MS)
     return () => clearTimeout(timer)
   }, [playing, date, loading, dates, compare, layer, leadTime, variable])
@@ -234,7 +234,8 @@ function App() {
                     onLang={setLang}
                     speaking={speech.speaking}
                     canSpeak={speech.canSpeak}
-                    onSpeak={(text, speechLang) => void speech.speak(text, speechLang)}
+                    speechSupported={speech.supported}
+                    onSpeak={(text, speechLang, fallback) => void speech.speak(text, speechLang, fallback)}
                     onStop={speech.stop}
                     onDispatch={() => setDispatchOpen(true)}
                     onClose={() => selectThreat(null)}
@@ -261,6 +262,7 @@ function App() {
           className={`absolute inset-x-0 bottom-0 lg:inset-x-auto lg:top-4 lg:right-4 lg:bottom-4 lg:w-96 ${SLIDE} ${slide(panels.right, 'right')} print:hidden`}
         >
           <ThreatMatrix
+            variable={variable}
             threats={threats}
             loading={alerts.loading}
             selectedId={selectedThreat}
@@ -291,6 +293,7 @@ function App() {
             <BulletinModal
               date={date}
               leadTime={leadTime}
+              variable={variable}
               threats={threats}
               onClose={() => setBulletinOpen(false)}
             />

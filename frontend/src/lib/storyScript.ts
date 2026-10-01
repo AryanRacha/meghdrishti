@@ -33,7 +33,7 @@ export interface StoryControls {
   setInspectPoint: (pt: { lat: number; lon: number } | null) => void
   setPlaying: (on: boolean) => void
   resetView: () => void
-  speak: (text: string, speechLang: string) => Promise<void>
+  speak: (text: string, speechLang: string, fallback?: { text: string; lang: string }) => Promise<void>
   stopSpeech: () => void
 }
 
@@ -251,7 +251,7 @@ export const STORY: Step[] = [
     text: (c) => {
       const t = top(c)
       return t
-        ? `${t.district}, ${t.state}: ${Math.round(t.peak_mm)} mm in 24 h · IMD ${CATEGORY_LABELS[t.category]}`
+        ? `${t.district}, ${t.state}: ${Math.round(t.peak)} ${t.units} in 24 h · IMD ${CATEGORY_LABELS[t.category]}`
         : 'No heavy-rain regions in this forecast.'
     },
     durationMs: 5000,
@@ -286,7 +286,8 @@ export const STORY: Step[] = [
       if (!t || !c.date) return
       const lang = regional(t)
       c.setLang(lang)
-      await c.speak(headline(alertText(t, c.date, lang)), LANGUAGES[lang].speech)
+      const english = { text: headline(alertText(t, c.date, 'en')), lang: LANGUAGES.en.speech }
+      await c.speak(headline(alertText(t, c.date, lang)), LANGUAGES[lang].speech, english)
     },
   },
   {

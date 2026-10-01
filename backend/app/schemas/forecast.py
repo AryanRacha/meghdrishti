@@ -7,6 +7,9 @@ Layer = Literal["blended", "gfs", "ai", "trust"]
 DataSource = Literal["processed", "synthetic"]
 WeightsMode = Literal["trained", "untrained"]
 ImdCategory = Literal["heavy", "very_heavy", "extremely_heavy"]
+WindCategory = Literal["strong_wind", "gale", "storm"]
+HeatCategory = Literal["heat_watch", "heatwave", "severe_heatwave"]
+ThreatCategory = ImdCategory | WindCategory | HeatCategory
 
 
 class RunInfo(BaseModel):
@@ -41,18 +44,21 @@ class ForecastGrid(BaseModel):
 
 class Threat(BaseModel):
     id: str
+    variable: Variable
+    units: str  # mm (rain), km/h (wind), °C (temp)
     district: str
     state: str
     distance_km: float  # from the district HQ to the peak cell
     lat: float
     lon: float
-    peak_mm: float
-    mean_mm: float
+    peak: float
+    mean: float
     area_km2: float
-    category: ImdCategory
+    category: ThreatCategory
+    level: int  # 1-3 within the hazard's scale (e.g. heavy / very heavy / extremely heavy)
     severity_rank: int
-    gfs_mm: float  # raw GFS value at the blended peak
-    ai_mm: float  # raw AI value at the blended peak
+    gfs_value: float  # raw GFS value at the blended peak
+    ai_value: float  # raw AI value at the blended peak
     gfs_trust: float  # U-Net GFS weight at the peak (XAI)
     population_exposed: int  # Census 2011 state density x affected land area
     risk_index: int  # 0-100, intensity x exposure

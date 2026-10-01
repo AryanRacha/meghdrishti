@@ -6,6 +6,8 @@ numpy
 scipy
 xarray
 netCDF4
+edge-tts
+transformers
 # torch: install the CPU wheel with
 #   pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch

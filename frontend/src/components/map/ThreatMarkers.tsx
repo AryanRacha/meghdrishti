@@ -1,7 +1,7 @@
 import L from 'leaflet'
 import { useEffect, useMemo } from 'react'
 import { CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet'
-import { CATEGORY_COLORS, CATEGORY_LABELS } from '../../lib/format'
+import { CATEGORY_LABELS, LEVEL_COLORS } from '../../lib/format'
 import type { Threat } from '../../types/forecast'
 
 interface ThreatMarkersProps {
@@ -24,7 +24,7 @@ function pulseIcon(color: string): L.DivIcon {
 export function ThreatMarkers({ threats, selectedId, onSelect }: ThreatMarkersProps) {
   const map = useMap()
   const selected = threats.find((t) => t.id === selectedId) ?? null
-  const icon = useMemo(() => (selected ? pulseIcon(CATEGORY_COLORS[selected.category]) : null), [selected])
+  const icon = useMemo(() => (selected ? pulseIcon(LEVEL_COLORS[selected.level]) : null), [selected])
 
   useEffect(() => {
     if (!selected) return
@@ -38,11 +38,11 @@ export function ThreatMarkers({ threats, selectedId, onSelect }: ThreatMarkersPr
           key={t.id}
           center={[t.lat, t.lon]}
           radius={t.id === selectedId ? 0 : 7}
-          pathOptions={{ color: CATEGORY_COLORS[t.category], weight: 2, fillOpacity: 0.2 }}
+          pathOptions={{ color: LEVEL_COLORS[t.level], weight: 2, fillOpacity: 0.2 }}
           eventHandlers={{ click: () => onSelect(t.id) }}
         >
           <Tooltip className="cell-tooltip" direction="top" offset={[0, -6]}>
-            #{t.severity_rank} {t.district} · {t.peak_mm} mm · {CATEGORY_LABELS[t.category]}
+            #{t.severity_rank} {t.district} · {t.peak} {t.units} · {CATEGORY_LABELS[t.category]}
           </Tooltip>
         </CircleMarker>
       ))}

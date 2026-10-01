@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { GlassPanel, PanelTitle } from '../ui/GlassPanel'
-import { CATEGORY_LABELS, CATEGORY_STYLES, formatPeople } from '../../lib/format'
-import type { Threat } from '../../types/forecast'
+import { CATEGORY_LABELS, LEVEL_STYLES, formatPeople } from '../../lib/format'
+import { HAZARDS } from '../../lib/hazards'
+import type { Threat, Variable } from '../../types/forecast'
 
 interface ThreatMatrixProps {
+  variable: Variable
   threats: Threat[]
   loading: boolean
   selectedId: string | null
@@ -59,13 +61,13 @@ function ThreatCard({ threat, selected, onSelect }: { threat: Threat; selected: 
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-lg leading-none font-semibold text-white tabular-nums">{t.peak_mm}</p>
-                <p className="text-[10px] text-slate-500">mm peak</p>
+                <p className="font-mono text-lg leading-none font-semibold text-white tabular-nums">{t.peak}</p>
+                <p className="text-[10px] text-slate-500">{t.units} peak</p>
               </div>
             </div>
 
             <div className="mt-2 flex items-center gap-2">
-              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ${CATEGORY_STYLES[t.category]}`}>
+              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ${LEVEL_STYLES[t.level]}`}>
                 {CATEGORY_LABELS[t.category]}
               </span>
               <span className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold ring-1 ${riskTone(t.risk_index)}`}>
@@ -81,11 +83,11 @@ function ThreatCard({ threat, selected, onSelect }: { threat: Threat; selected: 
             <dl className="mt-2.5 grid grid-cols-2 gap-x-3 font-mono text-[11px]">
               <div className="flex justify-between">
                 <dt className="text-slate-500">GFS</dt>
-                <dd className="text-slate-300 tabular-nums">{t.gfs_mm} mm</dd>
+                <dd className="text-slate-300 tabular-nums">{t.gfs_value} {t.units}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-slate-500">AI</dt>
-                <dd className="text-slate-300 tabular-nums">{t.ai_mm} mm</dd>
+                <dd className="text-slate-300 tabular-nums">{t.ai_value} {t.units}</dd>
               </div>
             </dl>
             <div className="mt-2">
@@ -98,9 +100,10 @@ function ThreatCard({ threat, selected, onSelect }: { threat: Threat; selected: 
   )
 }
 
-export function ThreatMatrix({ threats, loading, selectedId, onSelect, onOpenBulletin }: ThreatMatrixProps) {
+export function ThreatMatrix({ variable, threats, loading, selectedId, onSelect, onOpenBulletin }: ThreatMatrixProps) {
   const [open, setOpen] = useState(false) // mobile bottom sheet only
-  const extreme = threats.filter((t) => t.category !== 'heavy').length
+  const hazard = HAZARDS[variable]
+  const extreme = threats.filter((t) => t.level > 1).length
   const exposed = threats.reduce((sum, t) => sum + t.population_exposed, 0)
 
   return (
@@ -118,7 +121,7 @@ export function ThreatMatrix({ threats, loading, selectedId, onSelect, onOpenBul
         <div>
           <PanelTitle>Threat Matrix</PanelTitle>
           <p className="mt-0.5 text-xs text-slate-400">
-            IMD heavy rain ≥ 64.5 mm{exposed > 0 && <> · <span className="text-slate-200">{formatPeople(exposed)}</span> exposed</>}
+            {hazard.rule}{exposed > 0 && <> · <span className="text-slate-200">{formatPeople(exposed)}</span> exposed</>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -133,7 +136,7 @@ export function ThreatMatrix({ threats, loading, selectedId, onSelect, onOpenBul
 
       <ul className={`scrollbar-thin flex-1 space-y-2 overflow-y-auto p-3 transition-opacity ${loading ? 'opacity-50' : ''}`}>
         {threats.length === 0 && !loading && (
-          <li className="px-2 py-8 text-center text-sm text-slate-400">No heavy-rain regions in this forecast.</li>
+          <li className="px-2 py-8 text-center text-sm text-slate-400">{hazard.empty}</li>
         )}
         {threats.map((t) => (
           <ThreatCard key={t.id} threat={t} selected={t.id === selectedId} onSelect={() => onSelect(t.id)} />

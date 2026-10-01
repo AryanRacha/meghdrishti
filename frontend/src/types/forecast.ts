@@ -5,6 +5,10 @@ export type Layer = 'blended' | 'gfs' | 'ai' | 'trust'
 export type DataSource = 'processed' | 'synthetic'
 export type WeightsMode = 'trained' | 'untrained'
 export type ImdCategory = 'heavy' | 'very_heavy' | 'extremely_heavy'
+export type WindCategory = 'strong_wind' | 'gale' | 'storm'
+export type HeatCategory = 'heat_watch' | 'heatwave' | 'severe_heatwave'
+export type ThreatCategory = ImdCategory | WindCategory | HeatCategory
+export type ThreatLevel = 1 | 2 | 3
 
 export interface RunInfo {
   date: string
@@ -37,18 +41,21 @@ export interface ForecastGrid {
 
 export interface Threat {
   id: string
+  variable: Variable
+  units: string // mm (rain), km/h (wind), °C (temp)
   district: string
   state: string
   distance_km: number
   lat: number
   lon: number
-  peak_mm: number
-  mean_mm: number
+  peak: number
+  mean: number
   area_km2: number
-  category: ImdCategory
+  category: ThreatCategory
+  level: ThreatLevel // 1-3 within the hazard's scale
   severity_rank: number
-  gfs_mm: number
-  ai_mm: number
+  gfs_value: number
+  ai_value: number
   gfs_trust: number
   population_exposed: number
   risk_index: number

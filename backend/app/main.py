@@ -6,9 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.forecast import router as forecast_router
+from app.api.tts import router as tts_router
 from app.core.config import settings
 from app.schemas.forecast import HealthResponse
 from app.services.inference_engine import InferenceEngine
+from app.services.tts_engine import tts_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -16,6 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     InferenceEngine.get()  # load weights once at startup
+    tts_engine.warm_up()
     yield
 
 
@@ -32,6 +35,7 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(forecast_router, prefix=settings.API_V1_STR)
+app.include_router(tts_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", response_model=HealthResponse)

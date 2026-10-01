@@ -147,7 +147,11 @@ def forecast_grid(
 
 
 @router.get("/alerts", response_model=AlertsResponse)
-def forecast_alerts(date: str | None = DateParam, lead_time: int = LeadTimeParam) -> AlertsResponse:
+def forecast_alerts(
+    date: str | None = DateParam,
+    lead_time: int = LeadTimeParam,
+    variable: Variable = "rain",
+) -> AlertsResponse:
     engine = InferenceEngine.get()
     result = engine.predict(_resolve_date(date), lead_time)
-    return AlertsResponse(metadata=_run_info(result, engine), threats=detect_threats(result))
+    return AlertsResponse(metadata=_run_info(result, engine), threats=detect_threats(result, variable))

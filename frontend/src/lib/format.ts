@@ -1,4 +1,4 @@
-import type { ImdCategory, Layer, Variable } from '../types/forecast'
+import type { Layer, ThreatCategory, ThreatLevel, Variable } from '../types/forecast'
 
 export const VARIABLE_LABELS: Record<Variable, string> = {
   rain: 'Rain',
@@ -13,22 +13,29 @@ export const LAYER_LABELS: Record<Layer, string> = {
   trust: 'Trust',
 }
 
-export const CATEGORY_LABELS: Record<ImdCategory, string> = {
+export const CATEGORY_LABELS: Record<ThreatCategory, string> = {
   heavy: 'Heavy',
   very_heavy: 'Very heavy',
   extremely_heavy: 'Extremely heavy',
+  strong_wind: 'Strong wind',
+  gale: 'Gale',
+  storm: 'Storm-force',
+  heat_watch: 'Heat watch',
+  heatwave: 'Heatwave',
+  severe_heatwave: 'Severe heatwave',
 }
 
-export const CATEGORY_STYLES: Record<ImdCategory, string> = {
-  heavy: 'bg-yellow-400/15 text-yellow-300 ring-yellow-400/30',
-  very_heavy: 'bg-orange-500/15 text-orange-300 ring-orange-500/30',
-  extremely_heavy: 'bg-red-600/20 text-red-300 ring-red-500/40',
+/** Styles by severity level, shared by every hazard (yellow / orange / red). */
+export const LEVEL_STYLES: Record<ThreatLevel, string> = {
+  1: 'bg-yellow-400/15 text-yellow-300 ring-yellow-400/30',
+  2: 'bg-orange-500/15 text-orange-300 ring-orange-500/30',
+  3: 'bg-red-600/20 text-red-300 ring-red-500/40',
 }
 
-export const CATEGORY_COLORS: Record<ImdCategory, string> = {
-  heavy: '#facc15',
-  very_heavy: '#f97316',
-  extremely_heavy: '#dc2626',
+export const LEVEL_COLORS: Record<ThreatLevel, string> = {
+  1: '#facc15',
+  2: '#f97316',
+  3: '#dc2626',
 }
 
 export function formatValue(v: number, layer: Layer, units: string): string {

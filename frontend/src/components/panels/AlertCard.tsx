@@ -1,6 +1,7 @@
 import { GlassPanel, PanelTitle } from '../ui/GlassPanel'
 import { LANGUAGES, alertText, languagesFor, type LangCode } from '../../lib/alerts'
-import { CATEGORY_LABELS, CATEGORY_STYLES, formatPeople } from '../../lib/format'
+import { CATEGORY_LABELS, LEVEL_STYLES, formatPeople } from '../../lib/format'
+import type { SpeechFallback } from '../../hooks/useSpeech'
 import type { Threat } from '../../types/forecast'
 
 interface AlertCardProps {
@@ -10,7 +11,8 @@ interface AlertCardProps {
   onLang: (lang: LangCode) => void
   speaking: boolean
   canSpeak: (speechLang: string) => boolean
-  onSpeak: (text: string, speechLang: string) => void
+  speechSupported: boolean
+  onSpeak: (text: string, speechLang: string, fallback?: SpeechFallback) => void
   onStop: () => void
   onDispatch: () => void
   onClose: () => void
@@ -23,6 +25,14 @@ export function AlertCard(props: AlertCardProps) {
   const pack = LANGUAGES[active]
   const text = alertText(threat, date, active)
   const voiceAvailable = props.canSpeak(pack.speech)
+  // No voice for the regional language: read the English warning instead of staying silent
+  const fallback: SpeechFallback = { text: alertText(threat, date, 'en'), lang: LANGUAGES.en.speech }
+  const listenLabel = voiceAvailable || active === 'en' ? '🔊 Listen' : '🔊 Listen (English)'
+  const listenTitle = !props.speechSupported
+    ? 'Speech is not supported in this browser'
+    : voiceAvailable
+      ? undefined
+      : `No ${pack.label} voice installed in this browser; reading the English warning`
 
   return (
     <GlassPanel as="section" label="Public warning" strong className="p-4">
@@ -34,7 +44,7 @@ export function AlertCard(props: AlertCardProps) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ${CATEGORY_STYLES[threat.category]}`}>
+          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ${LEVEL_STYLES[threat.level]}`}>
             {CATEGORY_LABELS[threat.category]}
           </span>
           <button
@@ -76,12 +86,12 @@ export function AlertCard(props: AlertCardProps) {
         <div className="flex gap-2">
           <button
             type="button"
-            disabled={!voiceAvailable && !speaking}
-            title={voiceAvailable ? undefined : `No ${pack.label} voice installed in this browser`}
-            onClick={() => (speaking ? props.onStop() : props.onSpeak(text, pack.speech))}
+            disabled={!props.speechSupported}
+            title={listenTitle}
+            onClick={() => (speaking ? props.onStop() : props.onSpeak(text, pack.speech, fallback))}
             className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-100 ring-1 ring-white/15 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {speaking ? '■ Stop' : '🔊 Listen'}
+            {speaking ? '■ Stop' : listenLabel}
           </button>
           <button
             type="button"

@@ -59,10 +59,25 @@ def test_untrained_lead_time_is_flagged(client: TestClient) -> None:
 
 def test_alerts_ranked_by_peak(client: TestClient) -> None:
     body = client.get("/api/v1/forecast/alerts", params={"date": "2023-08-27"}).json()
-    peaks = [t["peak_mm"] for t in body["threats"]]
+    peaks = [t["peak"] for t in body["threats"]]
     assert peaks and peaks == sorted(peaks, reverse=True)
     assert all(p >= 64.5 for p in peaks)
+    assert all(t["variable"] == "rain" and t["units"] == "mm" for t in body["threats"])
     assert all(0 <= t["risk_index"] <= 100 and t["population_exposed"] >= 0 for t in body["threats"])
+
+
+@pytest.mark.parametrize(("variable", "units", "floor", "categories"), [
+    ("wind", "km/h", 40.0, {"strong_wind", "gale", "storm"}),
+    ("temp", "°C", 28.0, {"heat_watch", "heatwave", "severe_heatwave"}),
+])
+def test_wind_and_heat_alerts(client: TestClient, variable: str, units: str, floor: float,
+                              categories: set[str]) -> None:
+    body = client.get("/api/v1/forecast/alerts", params={"date": "2023-08-27", "variable": variable}).json()
+    threats = body["threats"]
+    assert threats, f"expected {variable} threats in the synthetic scenario"
+    peaks = [t["peak"] for t in threats]
+    assert peaks == sorted(peaks, reverse=True) and min(peaks) >= floor
+    assert all(t["units"] == units and t["category"] in categories and 1 <= t["level"] <= 3 for t in threats)
 
 
 @pytest.mark.parametrize("params", [

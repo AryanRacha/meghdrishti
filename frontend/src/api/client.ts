@@ -14,8 +14,8 @@ export function gridUrl(q: ForecastQuery): string {
   return `${API_BASE}/forecast/grid?${params}`
 }
 
-export function alertsUrl(q: Pick<ForecastQuery, 'date' | 'leadTime'>): string {
-  const params = new URLSearchParams({ date: q.date, lead_time: String(q.leadTime) })
+export function alertsUrl(q: Pick<ForecastQuery, 'date' | 'leadTime' | 'variable'>): string {
+  const params = new URLSearchParams({ date: q.date, lead_time: String(q.leadTime), variable: q.variable })
   return `${API_BASE}/forecast/alerts?${params}`
 }
 
@@ -50,4 +50,16 @@ export function fetchJson<T>(url: string): Promise<T> {
 
 export function prefetch(url: string): void {
   fetchJson(url).catch(() => undefined)
+}
+
+/** Spoken audio for a warning, synthesized by the backend (works in browsers without Indian voices). */
+export async function fetchSpeech(text: string, lang: string, signal?: AbortSignal): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, lang }),
+    signal,
+  })
+  if (!res.ok) throw new Error(`TTS ${res.status} ${res.statusText}`)
+  return res.blob()
 }
