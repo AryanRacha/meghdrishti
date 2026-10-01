@@ -31,10 +31,11 @@ interface ControlDockProps {
   playing: boolean
   onPlaying: (on: boolean) => void
   onTour: () => void
+  onDateDropdownOpen?: (open: boolean) => void
 }
 
 export function ControlDock(props: ControlDockProps) {
-  const { dates, date, onDate, leadTimes, trainedLeadTimes, leadTime, onLeadTime } = props
+  const { dates, date, onDate, leadTimes, trainedLeadTimes, leadTime, onLeadTime, onDateDropdownOpen } = props
   const leadIndex = Math.max(0, leadTimes.indexOf(leadTime))
   const validated = trainedLeadTimes.includes(leadTime)
 
@@ -82,7 +83,7 @@ export function ControlDock(props: ControlDockProps) {
       <div className="space-y-2">
         <PanelTitle>Forecast date</PanelTitle>
         <div className="flex gap-2">
-          <DateDropdown dates={dates} date={date} onDate={onDate} />
+          <DateDropdown dates={dates} date={date} onDate={onDate} onOpenChange={onDateDropdownOpen} />
           <button
             type="button"
             onClick={() => props.onPlaying(!props.playing)}

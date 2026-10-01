@@ -53,6 +53,7 @@ function App() {
   const [inspectPoint, setInspectPoint] = useState<{ lat: number; lon: number } | null>(null)
   const [resetKey, setResetKey] = useState(0)
   const [panels, setPanels] = useState<Panels>({ left: true, right: true })
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false)
 
   const dates = useMemo(() => meta.data?.dates ?? [], [meta.data])
   const date = pickedDate ?? dates.at(-1) ?? null
@@ -169,13 +170,19 @@ function App() {
 
       {/* Floating UI layer (above Leaflet panes/controls) */}
       <div className="pointer-events-none absolute inset-0 z-[1100] print:static print:inset-auto print:h-auto print:w-full print:overflow-visible">
-        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 overflow-y-auto [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden sm:w-80 print:hidden">
-          <Header
-            run={alerts.data?.metadata ?? null}
-            loading={loading}
-            error={error}
-            onOpenBulletin={() => setBulletinOpen(true)}
-          />
+        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-80 print:hidden">
+          <div
+            className={`transition-all duration-300 ease-in-out ${
+              dateDropdownOpen ? 'max-h-0 opacity-0 overflow-hidden pointer-events-none' : 'max-h-96 opacity-100'
+            }`}
+          >
+            <Header
+              run={alerts.data?.metadata ?? null}
+              loading={loading}
+              error={error}
+              onOpenBulletin={() => setBulletinOpen(true)}
+            />
+          </div>
           {meta.data && date && (
             <div className={`${SLIDE} ${slide(panels.left, 'left')}`}>
               <ControlDock
@@ -195,16 +202,18 @@ function App() {
                 playing={playing}
                 onPlaying={setPlaying}
                 onTour={story.start}
+                onDateDropdownOpen={setDateDropdownOpen}
               />
             </div>
           )}
-          {/* In the column flow (not pinned to the corner) so it never overlaps the controls */}
-          {layerMeta && scale && (
-            <div className="hidden sm:block">
-              <Legend metadata={layerMeta} scale={scale} />
-            </div>
-          )}
         </div>
+
+        {layerMeta && scale && (
+          <div className={`absolute bottom-4 left-4 hidden sm:block print:hidden ${SLIDE} ${slide(panels.left, 'left')}`}>
+            <Legend metadata={layerMeta} scale={scale} />
+          </div>
+        )}
+
 
         {story.caption?.panel && (
           <div className="print:hidden">

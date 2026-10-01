@@ -5,12 +5,19 @@ interface DateDropdownProps {
   dates: string[]
   date: string
   onDate: (date: string) => void
+  onOpenChange?: (open: boolean) => void
 }
 
-export function DateDropdown({ dates, date, onDate }: DateDropdownProps) {
+export function DateDropdown({ dates, date, onDate, onOpenChange }: DateDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const activeItemRef = useRef<HTMLButtonElement>(null)
+
+  // Notify parent of open state
+  useEffect(() => {
+    onOpenChange?.(open)
+  }, [open, onOpenChange])
 
   // Close on click outside
   useEffect(() => {
@@ -31,10 +38,18 @@ export function DateDropdown({ dates, date, onDate }: DateDropdownProps) {
     }
   }, [open])
 
-  // Scroll active item into view when opening
+  // Scroll active item into view within the dropdown list
   useEffect(() => {
-    if (open && activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({ block: 'nearest' })
+    if (open && activeItemRef.current && listRef.current) {
+      const item = activeItemRef.current
+      const list = listRef.current
+      const itemTop = item.offsetTop
+      const itemBottom = itemTop + item.offsetHeight
+      if (itemTop < list.scrollTop) {
+        list.scrollTop = itemTop
+      } else if (itemBottom > list.scrollTop + list.clientHeight) {
+        list.scrollTop = itemBottom - list.clientHeight
+      }
     }
   }, [open])
 
@@ -67,6 +82,7 @@ export function DateDropdown({ dates, date, onDate }: DateDropdownProps) {
 
       {open && (
         <div
+          ref={listRef}
           role="listbox"
           aria-label="Forecast dates"
           className="custom-scrollbar absolute left-0 top-[calc(100%+0.35rem)] z-50 w-full min-w-[11rem] max-h-72 overflow-y-auto overflow-x-hidden rounded-xl bg-slate-900/95 backdrop-blur-xl p-1 shadow-2xl ring-1 ring-white/15 outline-none"

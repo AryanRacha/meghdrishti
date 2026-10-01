@@ -17,7 +17,7 @@ export function Legend({ metadata, scale }: LegendProps) {
   const title = layer === 'trust' ? `Trust map · ${VARIABLE_LABELS[variable]}` : `${LAYER_LABELS[layer]} · ${VARIABLE_LABELS[variable]} (${units})`
 
   return (
-    <GlassPanel as="section" label="Map legend" className="w-full space-y-2.5 p-4">
+    <GlassPanel as="section" label="Map legend" className="w-64 space-y-2.5 p-4">
       <PanelTitle>{title}</PanelTitle>
 
       {scale.kind === 'stepped' ? (
