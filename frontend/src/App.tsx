@@ -236,6 +236,7 @@ function App() {
                     canSpeak={speech.canSpeak}
                     speechSupported={speech.supported}
                     onSpeak={(text, speechLang, fallback) => void speech.speak(text, speechLang, fallback)}
+                    onPrefetch={speech.prefetch}
                     onStop={speech.stop}
                     onDispatch={() => setDispatchOpen(true)}
                     onClose={() => selectThreat(null)}

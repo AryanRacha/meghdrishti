@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { GlassPanel, PanelTitle } from '../ui/GlassPanel'
 import { LANGUAGES, alertText, languagesFor, type LangCode } from '../../lib/alerts'
 import { CATEGORY_LABELS, LEVEL_STYLES, formatPeople } from '../../lib/format'
@@ -13,6 +14,7 @@ interface AlertCardProps {
   canSpeak: (speechLang: string) => boolean
   speechSupported: boolean
   onSpeak: (text: string, speechLang: string, fallback?: SpeechFallback) => void
+  onPrefetch: (text: string, speechLang: string) => void
   onStop: () => void
   onDispatch: () => void
   onClose: () => void
@@ -33,6 +35,17 @@ export function AlertCard(props: AlertCardProps) {
     : voiceAvailable
       ? undefined
       : `No ${pack.label} voice installed in this browser; reading the English warning`
+
+  // Generate audio for every language tab as soon as the warning opens (active tab first),
+  // so "Listen" plays immediately instead of waiting for the backend
+  const { onPrefetch } = props
+  useEffect(() => {
+    for (const code of [active, ...options.filter((c) => c !== active)]) {
+      onPrefetch(alertText(threat, date, code), LANGUAGES[code].speech)
+    }
+    // options derive from threat.state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threat, date, active, onPrefetch])
 
   return (
     <GlassPanel as="section" label="Public warning" strong className="p-4">

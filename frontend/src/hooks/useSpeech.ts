@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchSpeech } from '../api/client'
+import { loadSpeech } from '../api/client'
 
 const synth: SpeechSynthesis | undefined = typeof window !== 'undefined' ? window.speechSynthesis : undefined
 
@@ -37,7 +37,6 @@ function chunk(text: string): string[] {
 }
 
 interface Playback {
-  abort: AbortController
   resolve: () => void
   audio?: HTMLAudioElement
   url?: string
@@ -51,7 +50,6 @@ export function useSpeech() {
   const current = useRef<Playback | null>(null)
 
   const release = useCallback((p: Playback) => {
-    p.abort.abort()
     p.audio?.pause()
     if (p.url) URL.revokeObjectURL(p.url)
     synth?.cancel()
@@ -122,7 +120,7 @@ export function useSpeech() {
     (text: string, lang: string, fallback?: SpeechFallback): Promise<void> =>
       new Promise((resolve) => {
         if (current.current) release(current.current)
-        const p: Playback = { abort: new AbortController(), resolve, utterances: [] }
+        const p: Playback = { resolve, utterances: [] }
         current.current = p
         setSpeaking(true)
 
@@ -141,7 +139,7 @@ export function useSpeech() {
         }
 
         if (!SERVER_LANGS.has(baseLang(lang))) return toBrowser()
-        fetchSpeech(text, baseLang(lang), p.abort.signal)
+        loadSpeech(text, baseLang(lang))
           .then((blob) => {
             if (current.current !== p) return resolve()
             p.url = URL.createObjectURL(blob)
@@ -155,5 +153,10 @@ export function useSpeech() {
     [release, speakInBrowser],
   )
 
-  return { speak, stop, speaking, canSpeak, supported }
+  /** Starts generating backend audio ahead of time so a later speak() plays without waiting. */
+  const prefetch = useCallback((text: string, lang: string) => {
+    if (SERVER_LANGS.has(baseLang(lang))) loadSpeech(text, baseLang(lang)).catch(() => undefined)
+  }, [])
+
+  return { speak, stop, prefetch, speaking, canSpeak, supported }
 }

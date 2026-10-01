@@ -53,13 +53,33 @@ export function prefetch(url: string): void {
 }
 
 /** Spoken audio for a warning, synthesized by the backend (works in browsers without Indian voices). */
-export async function fetchSpeech(text: string, lang: string, signal?: AbortSignal): Promise<Blob> {
+async function requestSpeech(text: string, lang: string): Promise<Blob> {
   const res = await fetch(`${API_BASE}/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, lang }),
-    signal,
   })
   if (!res.ok) throw new Error(`TTS ${res.status} ${res.statusText}`)
   return res.blob()
+}
+
+// Audio is preloaded when a warning opens, so "Listen" plays instantly; in-flight requests are shared
+const SPEECH_CACHE_LIMIT = 24
+const speechCache = new Map<string, Promise<Blob>>()
+
+export function loadSpeech(text: string, lang: string): Promise<Blob> {
+  const key = `${lang}|${text}`
+  const hit = speechCache.get(key)
+  if (hit) {
+    speechCache.delete(key)
+    speechCache.set(key, hit) // refresh LRU position
+    return hit
+  }
+  const pending = requestSpeech(text, lang).catch((err: unknown) => {
+    speechCache.delete(key) // let a later click retry
+    throw err
+  })
+  speechCache.set(key, pending)
+  if (speechCache.size > SPEECH_CACHE_LIMIT) speechCache.delete(speechCache.keys().next().value as string)
+  return pending
 }

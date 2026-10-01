@@ -42,6 +42,13 @@ Brave (and Firefox) expose no Indian-language browser voices, so audio is genera
 ### 5. Guided Tour (`frontend/src/lib/storyScript.ts`)
 - The "Last-mile warning" step passes the English headline as the fallback, so the tour always speaks.
 
+### 5b. Instant "Listen" via Prefetch (`api/client.ts`, `useSpeech.ts`, `AlertCard.tsx`)
+- Synthesis takes ~2–3 s (edge-tts) to ~5–7 s (MMS) per warning, so audio is now generated **before** the click.
+- `loadSpeech()` in `api/client.ts` is an LRU cache (24 entries) of in-flight/complete audio promises. Prefetch and playback share the same request; failed requests are evicted so a later click retries.
+- `AlertCard` calls `prefetch` for every language tab when a warning opens, active tab first.
+- Measured on the dev machine: Marathi 3.35 s → 0.01 s, Odia 6.72 s → 0.01 s once prefetched.
+- Playback no longer aborts the fetch on stop. The shared request stays cached for the next click.
+
 ### 6. Dispatch Preview Layering (`frontend/src/components/panels/DispatchPreview.tsx`)
 - The overlay used `z-10` and rendered beneath the bottom card row (`AlertCard` + `PixelInspector`, `z-[950]`), which covered the phone mock-up.
 - Raised to `z-[1000]`: above the cards, below `BulletinModal` (`z-[1200]`). Added `overflow-y-auto` so the stacked mobile layout can scroll on short screens.
