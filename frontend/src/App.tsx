@@ -170,7 +170,11 @@ function App() {
 
       {/* Floating UI layer (above Leaflet panes/controls) */}
       <div className="pointer-events-none absolute inset-0 z-[1100] print:static print:inset-auto print:h-auto print:w-full print:overflow-visible">
-        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-80 print:hidden">
+        <div
+          className={`absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 ${
+            dateDropdownOpen ? 'overflow-visible' : 'overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          } sm:w-80 print:hidden`}
+        >
           <div
             className={`transition-all duration-300 ease-in-out ${
               dateDropdownOpen ? 'max-h-0 opacity-0 overflow-hidden pointer-events-none' : 'max-h-96 opacity-100'

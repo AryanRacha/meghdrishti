@@ -40,17 +40,21 @@ export function DateDropdown({ dates, date, onDate, onOpenChange }: DateDropdown
 
   // Scroll active item into view within the dropdown list
   useEffect(() => {
-    if (open && activeItemRef.current && listRef.current) {
-      const item = activeItemRef.current
-      const list = listRef.current
-      const itemTop = item.offsetTop
-      const itemBottom = itemTop + item.offsetHeight
-      if (itemTop < list.scrollTop) {
-        list.scrollTop = itemTop
-      } else if (itemBottom > list.scrollTop + list.clientHeight) {
-        list.scrollTop = itemBottom - list.clientHeight
+    if (!open) return
+    const id = requestAnimationFrame(() => {
+      if (activeItemRef.current && listRef.current) {
+        const item = activeItemRef.current
+        const list = listRef.current
+        const itemTop = item.offsetTop
+        const itemBottom = itemTop + item.offsetHeight
+        if (itemTop < list.scrollTop) {
+          list.scrollTop = itemTop
+        } else if (itemBottom > list.scrollTop + list.clientHeight) {
+          list.scrollTop = itemBottom - list.clientHeight
+        }
       }
-    }
+    })
+    return () => cancelAnimationFrame(id)
   }, [open])
 
   return (
