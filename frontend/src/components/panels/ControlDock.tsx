@@ -40,23 +40,23 @@ export function ControlDock(props: ControlDockProps) {
   const validated = trainedLeadTimes.includes(leadTime)
 
   return (
-    <GlassPanel as="section" label="Forecast controls" className="space-y-4 p-4">
-      <div className="space-y-2">
+    <GlassPanel as="section" label="Forecast controls" className="space-y-2.5 p-3 sm:space-y-3 sm:p-3.5">
+      <div className="space-y-1 sm:space-y-1.5">
         <PanelTitle>Variable</PanelTitle>
         <Segmented label="Variable" options={VARIABLES} value={props.variable} onChange={props.onVariable} renderLabel={(v) => VARIABLE_LABELS[v]} />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1 sm:space-y-1.5">
         <PanelTitle>Layer</PanelTitle>
         <div className={props.compare ? 'pointer-events-none opacity-40' : undefined}>
           <Segmented label="Layer" options={LAYERS} value={props.layer} onChange={props.onLayer} renderLabel={(l) => LAYER_LABELS[l]} />
         </div>
-        <p className="text-xs leading-relaxed text-slate-400">
+        <p className="text-[11px] leading-tight text-slate-400">
           {props.compare ? 'Drag the divider: raw GFS vs Super-UNet blend.' : LAYER_HINTS[props.layer]}
         </p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5 sm:space-y-2">
         <div className="flex items-baseline justify-between">
           <PanelTitle>Lead time</PanelTitle>
           <span className={`font-mono text-xs ${validated ? 'text-cyan-200' : 'text-amber-300'}`}>{leadTimeLabel(leadTime)}</span>
@@ -69,7 +69,7 @@ export function ControlDock(props: ControlDockProps) {
           step={1}
           value={leadIndex}
           onChange={(e) => onLeadTime(leadTimes[Number(e.target.value)])}
-          className="w-full accent-cyan-400"
+          className="w-full accent-cyan-400 cursor-pointer"
         />
         <div className="flex justify-between font-mono text-[10px] text-slate-500">
           {leadTimes.map((h) => (
@@ -80,7 +80,7 @@ export function ControlDock(props: ControlDockProps) {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5 sm:space-y-2">
         <PanelTitle>Forecast date</PanelTitle>
         <div className="flex gap-2">
           <DateDropdown dates={dates} date={date} onDate={onDate} onOpenChange={onDateDropdownOpen} />
@@ -89,7 +89,7 @@ export function ControlDock(props: ControlDockProps) {
             onClick={() => props.onPlaying(!props.playing)}
             aria-label={props.playing ? 'Pause time-lapse' : 'Play time-lapse'}
             aria-pressed={props.playing}
-            className={`grid w-10 place-items-center rounded-xl text-sm ring-1 transition-colors ${
+            className={`grid w-10 place-items-center rounded-xl text-sm ring-1 transition-colors cursor-pointer ${
               props.playing ? 'bg-cyan-400/20 text-cyan-100 ring-cyan-400/50' : 'bg-white/5 text-slate-200 ring-white/10 hover:text-white'
             }`}
           >
@@ -102,7 +102,7 @@ export function ControlDock(props: ControlDockProps) {
         type="button"
         aria-pressed={props.compare}
         onClick={() => props.onCompare(!props.compare)}
-        className={`w-full rounded-xl px-3 py-2 text-xs font-medium ring-1 transition-colors ${
+        className={`w-full rounded-xl px-3 py-1.5 sm:py-2 text-xs font-medium ring-1 transition-colors cursor-pointer ${
           props.compare ? 'bg-cyan-400/15 text-cyan-100 ring-cyan-400/40' : 'bg-white/5 text-slate-300 ring-white/10 hover:text-white'
         }`}
       >
@@ -112,7 +112,7 @@ export function ControlDock(props: ControlDockProps) {
       <button
         type="button"
         onClick={props.onTour}
-        className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-teal-400 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-900/40 transition-transform hover:scale-[1.01]"
+        className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-teal-400 py-2 sm:py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-900/40 transition-transform hover:scale-[1.01] cursor-pointer"
       >
         ▶ Guided Tour
       </button>

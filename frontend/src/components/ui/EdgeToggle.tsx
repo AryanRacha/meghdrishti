@@ -9,7 +9,7 @@ interface EdgeToggleProps {
 /** Slim tab on the screen edge that slides with its panel. */
 export function EdgeToggle({ side, open, onToggle, label, shortcut }: EdgeToggleProps) {
   const position =
-    side === 'left' ? (open ? 'left-[21.25rem]' : 'left-2') : open ? 'right-[25.25rem]' : 'right-2'
+    side === 'left' ? (open ? 'left-[20rem] xl:left-[21.25rem]' : 'left-2') : open ? 'right-[22rem] xl:right-[25.25rem]' : 'right-2'
   const chevron = side === 'left' ? (open ? '‹' : '›') : open ? '›' : '‹'
 
   return (

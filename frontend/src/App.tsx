@@ -52,7 +52,11 @@ function App() {
   )
   const [inspectPoint, setInspectPoint] = useState<{ lat: number; lon: number } | null>(null)
   const [resetKey, setResetKey] = useState(0)
-  const [panels, setPanels] = useState<Panels>({ left: true, right: true })
+  const [panels, setPanels] = useState<Panels>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+      ? { left: false, right: false }
+      : { left: true, right: true },
+  )
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false)
 
   const dates = useMemo(() => meta.data?.dates ?? [], [meta.data])
@@ -170,53 +174,70 @@ function App() {
 
       {/* Floating UI layer (above Leaflet panes/controls) */}
       <div className="pointer-events-none absolute inset-0 z-[1100] print:static print:inset-auto print:h-auto print:w-full print:overflow-visible">
+        {!panels.left && (
+          <button
+            type="button"
+            onClick={() => setPanels((p) => ({ ...p, left: true }))}
+            aria-label="Show forecast controls"
+            className="glass pointer-events-auto absolute top-3 left-3 z-[1100] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-cyan-200 ring-1 ring-cyan-400/30 transition-all hover:bg-white/10 sm:hidden cursor-pointer"
+          >
+            <span>☰</span>
+            <span>Controls</span>
+          </button>
+        )}
+
         <div
-          className={`absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 ${
-            dateDropdownOpen ? 'overflow-visible' : 'overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-          } sm:w-80 print:hidden`}
+          className={`pointer-events-none absolute top-3 bottom-3 left-3 sm:top-4 sm:bottom-4 sm:left-4 z-20 flex w-[calc(100%-1.5rem)] sm:w-76 xl:w-80 flex-col justify-between gap-2.5 ${SLIDE} ${slide(panels.left, 'left')} print:hidden`}
         >
           <div
-            className={`transition-all duration-300 ease-in-out ${
-              dateDropdownOpen ? 'max-h-0 opacity-0 overflow-hidden pointer-events-none' : 'max-h-96 opacity-100'
+            className={`pointer-events-auto flex flex-col gap-2 sm:gap-2.5 min-h-0 ${
+              dateDropdownOpen ? 'overflow-visible' : 'overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
             }`}
           >
-            <Header
-              run={alerts.data?.metadata ?? null}
-              loading={loading}
-              error={error}
-              onOpenBulletin={() => setBulletinOpen(true)}
-            />
-          </div>
-          {meta.data && date && (
-            <div className={`${SLIDE} ${slide(panels.left, 'left')}`}>
-              <ControlDock
-                dates={dates}
-                date={date}
-                onDate={setPickedDate}
-                leadTimes={meta.data.lead_times}
-                trainedLeadTimes={meta.data.trained_lead_times}
-                leadTime={leadTime}
-                onLeadTime={setLeadTime}
-                variable={variable}
-                onVariable={setVariable}
-                layer={layer}
-                onLayer={setLayer}
-                compare={compare}
-                onCompare={setCompare}
-                playing={playing}
-                onPlaying={setPlaying}
-                onTour={story.start}
-                onDateDropdownOpen={setDateDropdownOpen}
+            <div
+              className={`transition-all duration-300 ease-in-out shrink-0 ${
+                dateDropdownOpen ? 'max-h-0 opacity-0 overflow-hidden pointer-events-none' : 'max-h-96 opacity-100'
+              }`}
+            >
+              <Header
+                run={alerts.data?.metadata ?? null}
+                loading={loading}
+                error={error}
+                onOpenBulletin={() => setBulletinOpen(true)}
+                onClose={() => setPanels((p) => ({ ...p, left: false }))}
               />
+            </div>
+            {meta.data && date && (
+              <div className="shrink-0">
+                <ControlDock
+                  dates={dates}
+                  date={date}
+                  onDate={setPickedDate}
+                  leadTimes={meta.data.lead_times}
+                  trainedLeadTimes={meta.data.trained_lead_times}
+                  leadTime={leadTime}
+                  onLeadTime={setLeadTime}
+                  variable={variable}
+                  onVariable={setVariable}
+                  layer={layer}
+                  onLayer={setLayer}
+                  compare={compare}
+                  onCompare={setCompare}
+                  playing={playing}
+                  onPlaying={setPlaying}
+                  onTour={story.start}
+                  onDateDropdownOpen={setDateDropdownOpen}
+                />
+              </div>
+            )}
+          </div>
+
+          {layerMeta && scale && (
+            <div className="pointer-events-auto hidden sm:block shrink-0">
+              <Legend metadata={layerMeta} scale={scale} />
             </div>
           )}
         </div>
-
-        {layerMeta && scale && (
-          <div className={`absolute bottom-4 left-4 hidden sm:block print:hidden ${SLIDE} ${slide(panels.left, 'left')}`}>
-            <Legend metadata={layerMeta} scale={scale} />
-          </div>
-        )}
 
 
         {story.caption?.panel && (
@@ -234,8 +255,8 @@ function App() {
         {(Boolean(threat && date && activeLang) || Boolean(inspectPoint && date)) && (
           <div
             className={`pointer-events-none absolute bottom-4 inset-x-4 transition-[left,right] duration-500 z-[950] print:hidden ${
-              panels.left ? 'lg:left-[21.5rem]' : 'lg:left-4'
-            } ${panels.right ? 'lg:right-[25.5rem]' : 'lg:right-4'}`}
+              panels.left ? 'lg:left-[20rem] xl:left-[21.5rem]' : 'lg:left-4'
+            } ${panels.right ? 'lg:right-[22rem] xl:right-[25.5rem]' : 'lg:right-4'}`}
           >
             <div className="flex items-end justify-center gap-3.5 flex-wrap xl:flex-nowrap">
               {threat && date && activeLang && (
@@ -273,7 +294,7 @@ function App() {
         )}
 
         <div
-          className={`absolute inset-x-0 bottom-0 lg:inset-x-auto lg:top-4 lg:right-4 lg:bottom-4 lg:w-96 ${SLIDE} ${slide(panels.right, 'right')} print:hidden`}
+          className={`absolute inset-x-0 bottom-0 lg:inset-x-auto lg:top-4 lg:right-4 lg:bottom-4 lg:w-84 xl:w-96 ${SLIDE} ${slide(panels.right, 'right')} print:hidden`}
         >
           <ThreatMatrix
             variable={variable}
