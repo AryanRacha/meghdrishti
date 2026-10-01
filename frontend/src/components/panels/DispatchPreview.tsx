@@ -26,7 +26,7 @@ export function DispatchPreview({ threat, text, speechLang, onClose }: DispatchP
       aria-modal="true"
       aria-label="Alert dispatch preview"
       onClick={onClose}
-      className="pointer-events-auto absolute inset-0 z-10 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      className="pointer-events-auto absolute inset-0 z-[1000] grid place-items-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
     >
       <div onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-6 md:flex-row md:items-stretch">
         {/* Phone */}

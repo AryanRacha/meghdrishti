@@ -169,7 +169,7 @@ function App() {
 
       {/* Floating UI layer (above Leaflet panes/controls) */}
       <div className="pointer-events-none absolute inset-0 z-[1100] print:static print:inset-auto print:h-auto print:w-full print:overflow-visible">
-        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-80 print:hidden">
+        <div className="absolute top-4 left-4 flex w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] flex-col gap-3 overflow-y-auto [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden sm:w-80 print:hidden">
           <Header
             run={alerts.data?.metadata ?? null}
             loading={loading}
@@ -198,6 +198,12 @@ function App() {
               />
             </div>
           )}
+          {/* In the column flow (not pinned to the corner) so it never overlaps the controls */}
+          {layerMeta && scale && (
+            <div className="hidden sm:block">
+              <Legend metadata={layerMeta} scale={scale} />
+            </div>
+          )}
         </div>
 
         {story.caption?.panel && (
@@ -209,12 +215,6 @@ function App() {
         {story.caption && (
           <div className="absolute top-4 left-1/2 w-[min(38rem,calc(100%-2rem))] -translate-x-1/2 print:hidden">
             <StoryBar caption={story.caption} onNext={story.next} onPrev={story.prev} onStop={story.stop} />
-          </div>
-        )}
-
-        {layerMeta && scale && (
-          <div className="absolute bottom-4 left-4 hidden sm:block print:hidden">
-            <Legend metadata={layerMeta} scale={scale} />
           </div>
         )}
 

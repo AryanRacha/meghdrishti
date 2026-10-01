@@ -42,6 +42,15 @@ Brave (and Firefox) expose no Indian-language browser voices, so audio is genera
 ### 5. Guided Tour (`frontend/src/lib/storyScript.ts`)
 - The "Last-mile warning" step passes the English headline as the fallback, so the tour always speaks.
 
+### 6. Dispatch Preview Layering (`frontend/src/components/panels/DispatchPreview.tsx`)
+- The overlay used `z-10` and rendered beneath the bottom card row (`AlertCard` + `PixelInspector`, `z-[950]`), which covered the phone mock-up.
+- Raised to `z-[1000]`: above the cards, below `BulletinModal` (`z-[1200]`). Added `overflow-y-auto` so the stacked mobile layout can scroll on short screens.
+
+### 7. Map Legend Placement (`frontend/src/App.tsx`, `Legend.tsx`)
+- The legend was pinned `absolute bottom-4 left-4`, independent of the left control column, so on shorter screens the controls ran into it.
+- It now renders inside the left column under `ControlDock` (full column width), so the two stack and scroll together.
+- Column children are `shrink-0`, so panels scroll instead of being squashed.
+
 ---
 
 ## Notes
