@@ -57,8 +57,12 @@ def dev() -> None:
 
 def start() -> None:
     """Run production server."""
+    import os
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False, workers=2)
+
+    port = int(os.environ.get("PORT", 8000))
+    workers = int(os.environ.get("WEB_CONCURRENCY", 1))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False, workers=workers)
 
 
 if __name__ == "__main__":

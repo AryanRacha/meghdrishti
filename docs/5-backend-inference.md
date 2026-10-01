@@ -116,3 +116,15 @@ python -m venv .venv
 .venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 .venv/Scripts/python -m pytest
 ```
+
+## Cloud Deployment (Render Free Tier)
+
+| Setting | Value |
+|---|---|
+| **Root Directory** | `backend` |
+| **Build Command** | `pip install uv && uv sync --no-dev` (or pip CPU torch command) |
+| **Start Command** | `uv run start` |
+| **Environment Variables** | `DEVICE=cpu`, `PYTHON_VERSION=3.11.0` |
+
+*Note*: `app.main:start` automatically binds to `$PORT` provided by Render and runs with 1 worker to stay well within Render Free Tier's 512MB RAM cap.
+
