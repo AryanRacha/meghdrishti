@@ -38,6 +38,14 @@ function App() {
   const meta = useApi<MetaResponse>(metaUrl())
 
   const [pickedDate, setPickedDate] = useState<string | null>(null)
+  const [debouncedDate, setDebouncedDate] = useState<string | null>(null)
+  
+  // Debounce the date to prevent fetching spam when rapidly pressing arrow keys
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedDate(pickedDate), 350)
+    return () => clearTimeout(t)
+  }, [pickedDate])
+
   const [leadTime, setLeadTime] = useState(24)
   const [variable, setVariable] = useState<Variable>('rain')
   const [layer, setLayer] = useState<Layer>('blended')
@@ -61,12 +69,15 @@ function App() {
 
   const dates = useMemo(() => meta.data?.dates ?? [], [meta.data])
   const date = pickedDate ?? dates.at(-1) ?? null
-  const query = (l: Layer) => (date ? gridUrl({ date, leadTime, variable, layer: l }) : null)
+  
+  // The fetch date lags behind the UI date while spamming arrow keys
+  const activeFetchDate = debouncedDate ?? dates.at(-1) ?? null
+  const query = (l: Layer) => (activeFetchDate ? gridUrl({ date: activeFetchDate, leadTime, variable, layer: l }) : null)
 
   const single = useApi<ForecastGrid>(compare ? null : query(layer))
   const left = useApi<ForecastGrid>(compare ? query('gfs') : null)
   const right = useApi<ForecastGrid>(compare ? query('blended') : null)
-  const alerts = useApi<AlertsResponse>(date ? alertsUrl({ date, leadTime, variable }) : null)
+  const alerts = useApi<AlertsResponse>(activeFetchDate ? alertsUrl({ date: activeFetchDate, leadTime, variable }) : null)
 
   // Colour by what the data *is*, not what is selected, so stale data is never mis-coloured mid-fetch
   const shown = compare ? right.data : single.data
@@ -76,7 +87,8 @@ function App() {
   const threats = useMemo(() => alerts.data?.threats ?? [], [alerts.data?.threats])
   const threat = threats.find((t) => t.id === selectedThreat) ?? null
   const activeLang = threat ? (lang && languagesFor(threat.state).includes(lang) ? lang : languagesFor(threat.state)[0]) : null
-  const loading = (compare ? left.loading || right.loading : single.loading) || alerts.loading
+  const isDebouncing = pickedDate !== debouncedDate
+  const loading = isDebouncing || (compare ? left.loading || right.loading : single.loading) || alerts.loading
   const error = meta.error ?? single.error ?? left.error ?? right.error ?? alerts.error
 
   const speech = useSpeech()
@@ -106,16 +118,28 @@ function App() {
     return () => clearTimeout(timer)
   }, [playing, date, loading, dates, compare, layer, leadTime, variable])
 
-  // Keyboard: [ toggles controls, ] toggles Threat Matrix
+  // Keyboard: [ toggles controls, ] toggles Threat Matrix, Arrows change date chronologically
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
+      
       if (e.key === '[') setPanels((p) => ({ ...p, left: !p.left }))
       if (e.key === ']') setPanels((p) => ({ ...p, right: !p.right }))
+      
+      if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && date) {
+        // Prevent Leaflet from panning the map when we want to change dates
+        e.stopPropagation()
+        
+        const d = new Date(date)
+        d.setDate(d.getDate() + (e.key === 'ArrowRight' ? 1 : -1))
+        const newDateStr = d.toISOString().split('T')[0]
+        setPickedDate(newDateStr)
+      }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+    // Use capture phase so Leaflet doesn't swallow the event first
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [date])
 
   const story = useStoryMode({
     dates,
@@ -149,6 +173,10 @@ function App() {
 
   return (
     <main className={`relative h-full w-full overflow-hidden ${panels.right ? 'right-open' : ''} print:h-auto print:overflow-visible`}>
+      {/* Subtle top progress bar for data fetching */}
+      <div className={`absolute top-0 inset-x-0 h-[2px] z-[2000] overflow-hidden pointer-events-none transition-opacity duration-300 ${loading ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="h-full w-full bg-cyan-400 origin-left" style={{ animation: 'loading-progress 1.5s infinite ease-in-out' }} />
+      </div>
       <ForecastMap onMapClick={(lat, lon) => setInspectPoint({ lat, lon })}>
         {compare && left.data && right.data && scale ? (
           <SwipeCompare left={left.data} right={right.data} scale={scale} position={swipe} />
