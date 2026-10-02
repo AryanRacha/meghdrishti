@@ -118,28 +118,6 @@ function App() {
     return () => clearTimeout(timer)
   }, [playing, date, loading, dates, compare, layer, leadTime, variable])
 
-  // Keyboard: [ toggles controls, ] toggles Threat Matrix, Arrows change date chronologically
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
-      
-      if (e.key === '[') setPanels((p) => ({ ...p, left: !p.left }))
-      if (e.key === ']') setPanels((p) => ({ ...p, right: !p.right }))
-      
-      if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && date) {
-        // Prevent Leaflet from panning the map when we want to change dates
-        e.stopPropagation()
-        
-        const d = new Date(date)
-        d.setDate(d.getDate() + (e.key === 'ArrowRight' ? 1 : -1))
-        const newDateStr = d.toISOString().split('T')[0]
-        setPickedDate(newDateStr)
-      }
-    }
-    // Use capture phase so Leaflet doesn't swallow the event first
-    window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [date])
 
   const story = useStoryMode({
     dates,
@@ -163,6 +141,29 @@ function App() {
     speak: speech.speak,
     stopSpeech: speech.stop,
   })
+
+  // Keyboard: [ toggles controls, ] toggles Threat Matrix, Arrows change date chronologically
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
+      
+      if (e.key === '[') setPanels((p) => ({ ...p, left: !p.left }))
+      if (e.key === ']') setPanels((p) => ({ ...p, right: !p.right }))
+      
+      if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && date && !story.active) {
+        // Prevent Leaflet from panning the map when we want to change dates
+        e.stopPropagation()
+        
+        const d = new Date(date)
+        d.setDate(d.getDate() + (e.key === 'ArrowRight' ? 1 : -1))
+        const newDateStr = d.toISOString().split('T')[0]
+        setPickedDate(newDateStr)
+      }
+    }
+    // Use capture phase so Leaflet doesn't swallow the event first
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [date, story.active])
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tour')) {
