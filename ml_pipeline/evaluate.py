@@ -2,7 +2,7 @@ import os
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
-from models.unet_blender import UNetBlender
+from models.unet_blender import SuperUNetBlender
 from data_loaders.weather_dataset import ProductionWeatherDataset
 import logging
 
@@ -13,34 +13,25 @@ def evaluate():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.info(f"Evaluation device: {device}")
     
-    # We trained on August 2023. Let's evaluate on September 2023 (unseen data).
     dates = [f"2023-09-{d:02d}" for d in range(1, 31)]
-    
-    stats_dict = {
-        'gfs': (5.0, 10.0),
-        'ai': (4.5, 9.5),
-        'dem': (500.0, 1000.0),
-        'lead_time': (24.0, 1.0)
-    }
     
     data_dir = os.path.join(os.path.dirname(__file__), 'data/processed')
     eval_dataset = ProductionWeatherDataset(
         data_dir=data_dir,
         dates=dates,
-        stats_dict=stats_dict,
         target_shape=(128, 128)
     )
     
     eval_loader = DataLoader(
         eval_dataset,
-        batch_size=30,  # All 30 days of Sept in one batch for fast evaluation
+        batch_size=30,
         shuffle=False,
         num_workers=0
     )
     
-    model = UNetBlender(n_channels=4, n_models=2, features=[32, 64, 128, 256]).to(device)
+    model = SuperUNetBlender(n_channels=7, n_models=2, features=[32, 64, 128, 256]).to(device)
     
-    weights_path = "unet_blender_weights.pth"
+    weights_path = "super_unet_blender_weights.pth"
     if not os.path.exists(weights_path):
         logger.error(f"Weights file {weights_path} not found!")
         return
@@ -50,38 +41,42 @@ def evaluate():
     logger.info("Model weights loaded successfully.")
     
     with torch.no_grad():
-        for inputs, forecasts, targets in eval_loader:
+        for inputs, lead_time, forecasts, targets in eval_loader:
             inputs = inputs.to(device)
-            forecasts = forecasts.to(device)
-            targets = targets.to(device)
+            lead_time = lead_time.to(device)
             
-            # Predict spatial blending weight maps
-            weight_maps = model(inputs)  
+            f_rain, f_temp, f_wind = [f.to(device) for f in forecasts]
+            t_rain, t_temp, t_wind = [t.to(device) for t in targets]
             
-            # Compute Blended Forecast
-            blended_prediction = torch.sum(weight_maps * forecasts, dim=1, keepdim=True)
+            w_rain, w_temp, w_wind = model(inputs, lead_time)  
             
-            # Standard Metrics
-            mse = torch.mean((blended_prediction - targets) ** 2).item()
-            mae = torch.mean(torch.abs(blended_prediction - targets)).item()
+            blend_rain = torch.sum(w_rain * f_rain, dim=1, keepdim=True)
             
-            # Compare with raw GFS (which is channel 0 of the forecasts)
-            gfs_only = forecasts[:, 0:1, :, :] 
-            gfs_mse = torch.mean((gfs_only - targets) ** 2).item()
-            gfs_mae = torch.mean(torch.abs(gfs_only - targets)).item()
+            # Standard Metrics for Rain
+            mse = torch.mean((blend_rain - t_rain) ** 2).item()
+            mae = torch.mean(torch.abs(blend_rain - t_rain)).item()
+            
+            # Threshold for POD/FAR/CSI (Extreme Rain > 8.0)
+            threshold = 8.0
+            pred_event = (blend_rain > threshold)
+            true_event = (t_rain > threshold)
+            
+            hits = torch.sum(pred_event & true_event).item()
+            false_alarms = torch.sum(pred_event & ~true_event).item()
+            misses = torch.sum(~pred_event & true_event).item()
+            
+            pod = hits / (hits + misses) if (hits + misses) > 0 else 0.0
+            far = false_alarms / (hits + false_alarms) if (hits + false_alarms) > 0 else 0.0
+            csi = hits / (hits + misses + false_alarms) if (hits + misses + false_alarms) > 0 else 0.0
             
             logger.info(f"--- Evaluation Metrics (September 2023) ---")
-            logger.info(f"Blended Model MSE: {mse:.4f}")
-            logger.info(f"Raw GFS MSE:       {gfs_mse:.4f}")
-            logger.info(f"---")
-            logger.info(f"Blended Model MAE: {mae:.4f}")
-            logger.info(f"Raw GFS MAE:       {gfs_mae:.4f}")
+            logger.info(f"Blended Rain RMSE: {np.sqrt(mse):.4f}")
+            logger.info(f"Blended Rain MAE:  {mae:.4f}")
+            logger.info(f"--- Extreme Rain (>{threshold}mm) ---")
+            logger.info(f"Probability of Detection (POD): {pod:.4f}")
+            logger.info(f"False Alarm Ratio (FAR):        {far:.4f}")
+            logger.info(f"Critical Success Index (CSI):   {csi:.4f}")
             logger.info(f"-------------------------------------------")
-            
-            if mse < gfs_mse:
-                logger.info("✅ SUCCESS: AI Blended model outperformed raw GFS!")
-            else:
-                logger.warning("❌ Blended model underperformed compared to GFS.")
-            
+
 if __name__ == '__main__':
     evaluate()

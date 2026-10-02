@@ -83,7 +83,11 @@ export function Header({ run, loading, error, onOpenBulletin, onClose }: HeaderP
           ) : (
             <Badge tone="bad" title="Weights file not found; model is randomly initialised">Untrained Weights</Badge>
           )}
-          {run.data_source === 'synthetic' ? (
+          {run.data_source === 'live_noaa_s3' ? (
+            <Badge tone="ok" title="Real-Time Live NOAA S3 GFS + Operational Stream Ingestion">
+              Live NWP · Real-Time
+            </Badge>
+          ) : run.data_source === 'synthetic' ? (
             <Badge tone="ok" title="August 2023 Monsoon Disaster Case Study (Mandi/Kullu Cloudburst Replay)">
               Replay · Aug 2023
             </Badge>

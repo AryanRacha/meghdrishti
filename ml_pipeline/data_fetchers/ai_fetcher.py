@@ -41,10 +41,14 @@ def generate_synthetic_graphcast(date="2023-08", input_era5_dir="data/raw/era5",
     
     logger.info("Applying noise patterns to Rain, Temp, and Wind...")
     
-    # Precipitation (AI models often underestimate extremes, so we apply a slight reduction + noise)
+    from scipy.ndimage import gaussian_filter
+    
+    # Precipitation (AI models often underestimate extremes, so we apply a slight reduction + noise + blur)
     if 'tp' in ds:
         noise_rain = np.random.normal(0, 0.002, ds['tp'].shape)
-        ds_synthetic['precipitation'] = (ds['tp'] * 0.9) + noise_rain
+        # Weaken extremes and apply blur
+        blurred_rain = gaussian_filter(ds['tp'], sigma=1.5)
+        ds_synthetic['precipitation'] = (blurred_rain * 0.7) + noise_rain
     else:
         # Fallback if ERA5 download missed 'tp' due to CDS API limits
         logger.warning("'tp' missing from ERA5, generating fully synthetic precipitation...")

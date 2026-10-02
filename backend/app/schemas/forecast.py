@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 Variable = Literal["rain", "temp", "wind"]
 Layer = Literal["blended", "gfs", "ai", "trust"]
-DataSource = Literal["processed", "synthetic"]
+DataSource = Literal["processed", "synthetic", "live_noaa_s3"]
 WeightsMode = Literal["trained", "untrained"]
 ImdCategory = Literal["heavy", "very_heavy", "extremely_heavy"]
 WindCategory = Literal["strong_wind", "gale", "storm"]

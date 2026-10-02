@@ -10,8 +10,13 @@ from scipy.ndimage import gaussian_filter
 
 from app.core.config import settings
 from app.core.grid import LAT_GRID, LON_GRID
+from app.services.noaa_s3_fetcher import NOAAByteRangeFetcher
+from app.services.operational_ai_fetcher import OperationalAIFetcher
 
-DataSource = Literal["processed", "synthetic"]
+DataSource = Literal["processed", "synthetic", "live_noaa_s3"]
+
+_noaa_fetcher = NOAAByteRangeFetcher()
+_ai_fetcher = OperationalAIFetcher()
 
 # Synthetic scenarios cover the training month (monsoon, August 2023)
 SYNTHETIC_START = Date(2023, 8, 1)
@@ -45,17 +50,47 @@ class ForecastInputs:
 
 def available_dates() -> list[str]:
     processed_dir = settings.PROCESSED_DATA_DIR
+    dates = []
     if processed_dir.is_dir():
         dates = sorted(p.stem for p in processed_dir.glob("*.pt"))
-        if dates:
-            return dates
-    return [(SYNTHETIC_START + timedelta(days=i)).isoformat() for i in range(SYNTHETIC_DAYS)]
+    if not dates:
+        dates = [(SYNTHETIC_START + timedelta(days=i)).isoformat() for i in range(SYNTHETIC_DAYS)]
+    
+    today_str = Date.today().isoformat()
+    if today_str not in dates:
+        dates.append(today_str)
+    return dates
 
 
 def load_inputs(date: str, lead_time: int) -> ForecastInputs:
     path = settings.PROCESSED_DATA_DIR / f"{date}.pt"
     if path.is_file():
         return _load_processed(path)
+    
+    today = Date.today()
+    today_str = today.isoformat()
+    # If date is today or recent operational live date (within 10 days up to today)
+    try:
+        req_date = Date.fromisoformat(date)
+        is_live_candidate = 0 <= (today - req_date).days <= 10
+    except ValueError:
+        is_live_candidate = False
+
+    if is_live_candidate:
+        try:
+            gfs_res = _noaa_fetcher.fetch_gfs_india(date_str=date, cycle="00", lead_time=lead_time)
+            if gfs_res is not None:
+                ai_res = _ai_fetcher.fetch_ai_india(date_str=date, lead_time=lead_time, gfs_reference=gfs_res)
+                if ai_res is not None:
+                    return ForecastInputs(
+                        gfs=ModelFields(rain=gfs_res["rain"], temp=gfs_res["temp"], wind=gfs_res["wind"]),
+                        ai=ModelFields(rain=ai_res["rain"], temp=ai_res["temp"], wind=ai_res["wind"]),
+                        dem=_synthetic_dem(),
+                        source="live_noaa_s3",
+                    )
+        except Exception as exc:
+            pass  # Fallback to calibrated scenario below
+            
     return _synthesize(date, lead_time)
 
 

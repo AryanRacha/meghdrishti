@@ -35,7 +35,7 @@ def preprocess_all():
                 if matched:
                     gfs_tensors[v] = torch.tensor(ds_interp[matched[0]].values, dtype=torch.float32)
         
-        gfs_rain = gfs_tensors.get('tp', torch.zeros((128,128))) * 1000.0
+        gfs_rain = gfs_tensors.get('tp', torch.zeros((128,128)))
         gfs_temp = gfs_tensors.get('t2m', torch.zeros((128,128)))
         gfs_wind = torch.sqrt(gfs_tensors.get('u10', torch.zeros((128,128)))**2 + gfs_tensors.get('v10', torch.zeros((128,128)))**2)
         
