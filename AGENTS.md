@@ -35,4 +35,4 @@ This repository contains the codebase for SIH26081 (Ministry of Earth Sciences).
 6. **The 'Winning Edge' (Context)**: The core differentiator for SIH26081 is preserving extreme weather events. Ensure the U-Net always utilizes the Custom Extreme Weighted Loss function rather than defaulting to standard MSE.
 
 ## Git Commit Rules
-- **NEVER** run `git commit` unless the user explicitly gives approval or explicitly asks you to commit.
+- **NEVER** run `git add` or `git commit` unless the user explicitly gives approval or explicitly asks you to stage/commit.
