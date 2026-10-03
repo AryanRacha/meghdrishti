@@ -20,9 +20,9 @@
     2. **Cross-Attention:** Our AI is "Time-Aware." It dynamically changes its blending strategy depending on whether it is predicting tomorrow's weather or next week's weather.
     3. **The Safety Valve:** We built a "Residual Bias Head." If both the physical model and the AI model completely miss a storm, our AI can physically inject rain into the final forecast because it recognized the dropping pressure and rising humidity.
 
-## Slide 4: Solving the Data Trap (Why Our AI is Production-Ready)
-* **Visual:** A side-by-side of "Perfect Lab Data" vs "Noisy Real-World Data."
-* **The Pitch:** Most teams train their AI on perfect, post-corrected reanalysis data (ERA5). This causes the AI to fail catastrophically in the real world when it encounters live, noisy data. We trained Meghdrishti using historical **noisy operational data (GDAS)**. Our system is battle-tested for live production, not just a hackathon lab.
+## Slide 4: Solving the Data Trap (The Licensing Reality)
+* **Visual:** A side-by-side of "Perfect Lab Data (ERA5)" vs "Noisy Real-World Data (Operational)."
+* **The Pitch:** Most AI fails in production because it is trained on perfect ERA5 reanalysis data, making it falsely confident. Our architecture is explicitly engineered to ingest noisy **Operational Data (OD)** to prevent Analysis Bias. However, we will transparently state that because ECMWF heavily restricts OD to commercial/member-state licenses, our prototype demonstrates the pipeline using ERA5. When handed to IMD, it flips directly to OD.
 
 ## Slide 5: The Secret Weapon (Extreme-Weighted Loss)
 * **Visual:** A graph showing a massive spike in rainfall. Show the AI dedicating 100% of its focus to that spike.
@@ -36,5 +36,5 @@
 
 ## 🎬 Video Submission Tips
 1. **First 30 Seconds:** Do not waste time on team introductions. Start immediately with: *"IMD's current blending methods erase extreme weather. We built a 13-channel PyTorch U-Net to fix it."*
-2. **The "Tech Flex":** Make sure to mention **Spatio-Temporal Cross-Attention**, **Super-Resolution ($320 \times 320$)**, and the **Leave-One-Season-Out (LOSO)** validation. Judges love seeing rigorous academic terminology applied practically.
+2. **The "Tech Flex":** Make sure to mention **Spatio-Temporal Cross-Attention**, **Super-Resolution ($320 \times 320$)**, and the **3-Year Leave-One-Season-Out (LOSO) (2021-2023)** validation. Judges love seeing rigorous academic terminology applied practically.
 3. **The Proof:** Show a screenshot of the `evaluation_report.json` or the terminal output where our Super-UNet mathematically beats the Simple Average baseline in the Extreme Dependency Index (EDI). 

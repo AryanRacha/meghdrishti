@@ -11,3 +11,8 @@ ml_pipeline/data/
 *.egg-info/
 dist/
 
+
+# Ignore AI model weights, logs, and symlinks
+*.onnx
+ml_pipeline/data
+*.log

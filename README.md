@@ -20,9 +20,9 @@ We abandoned simple mathematical averaging (and traditional ML) for a cutting-ed
 
 Building a system capable of passing the IMD's stringent validation standards required solving massive data and mathematical traps:
 
-### 1. Eliminating "Analysis Bias" (The Perfect Initialization Trap)
-* **The Problem:** If you train a blending model on AI hindcasts that were generated using ERA5 (a perfect, post-corrected reanalysis), the blending model will falsely learn that the AI is flawless. In live production, the AI gets fed noisy operational data, causing the blending model to fail catastrophically.
-* **The Solution:** We explicitly generate our historical Pangu-Weather training data using noisy NOAA GDAS/ECMWF Operational Analysis initial conditions. Our training data perfectly mirrors live operational deployment noise.
+### 1. Eliminating "Analysis Bias" (The Licensing Reality)
+* **The Problem:** If you train a blending model on AI hindcasts generated using ERA5 (a perfect, post-corrected reanalysis), it falsely learns the AI is flawless. In live production, the AI gets fed noisy operational data, causing the blending model to fail.
+* **The Hackathon Fallback:** Our architecture is explicitly designed to ingest noisy Operational Data (OD) to mirror live deployment noise. However, because ECMWF heavily restricts MARS Operational Data to commercial and member-state licenses, this **Hackathon Prototype** leverages the open Copernicus CDS API (ERA5). When deployed by the IMD, the data pipeline simply flips back to OD.
 
 ### 2. The Vector Cancellation Trap
 * **The Problem:** Blending wind "magnitude" is physically illegal. A +15m/s East wind and a -15m/s West wind should cancel to zero. If you blend magnitudes, the model incorrectly predicts a 15m/s storm.
