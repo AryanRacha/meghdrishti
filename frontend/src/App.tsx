@@ -157,7 +157,12 @@ function App() {
         const d = new Date(date)
         d.setDate(d.getDate() + (e.key === 'ArrowRight' ? 1 : -1))
         const newDateStr = d.toISOString().split('T')[0]
-        setPickedDate(newDateStr)
+        
+        // Prevent navigating into the future (which triggers synthetic fallbacks)
+        const todayStr = new Date().toISOString().split('T')[0]
+        if (newDateStr <= todayStr) {
+          setPickedDate(newDateStr)
+        }
       }
     }
     // Use capture phase so Leaflet doesn't swallow the event first
