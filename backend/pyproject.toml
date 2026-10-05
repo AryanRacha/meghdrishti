@@ -21,6 +21,8 @@ dependencies = [
     "ecmwf-opendata>=0.3.34",
     "eccodeslib>=2.49.0.30",
     "eckitlib>=2.3.0.30",
+    "gradio>=6.29.1",
+    "spaces>=0.51.3",
 ]
 
 
