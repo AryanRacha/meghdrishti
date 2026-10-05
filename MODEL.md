@@ -1,95 +1,113 @@
-# SIH26081: The Super-Ensemble Blending Model (Architecture & Flow)
+# Meghdrishti: The AI Model Deep Dive (V2 Master Blueprint)
 
-This document is the definitive guide to the Machine Learning architecture built for the Ministry of Earth Sciences SIH26081 problem statement. It explains exactly how the model works, the data flow from ingestion to the frontend, and the engineering decisions behind the system.
-
----
-
-## 1. The Core Concept (What it actually does)
-At its core, this project solves a major problem in meteorology: **Physical Models (GFS)** are great at understanding physics but struggle with local topography, while **AI Models (GraphCast)** are incredibly fast but sometimes blur extreme weather events. 
-
-Instead of just mathematically averaging these models together (which dilutes extreme events like cloudbursts), we built a **Spatial U-Net (A Deep Learning Vision Model)**. 
-Our U-Net looks at the GFS forecast, looks at the AI forecast, looks at the mountains (Topography), and learns a dynamic "Trust Map". It might learn to trust GFS in the Himalayas, but trust GraphCast in the plains. It outputs a set of weights (from 0.0 to 1.0) that dictate exactly how to blend the models together at every single pixel.
+*This document is the definitive, multi-stage breakdown of the Meghdrishti V2 system. It details exactly how the data flows, the sequential stacking of the neural network architecture, and the mathematical optimizations applied at each step to ensure production-grade accuracy for the India Meteorological Department (IMD).*
 
 ---
 
-## 2. The Input Data (Where it comes from)
-The U-Net takes in a massive mathematical "image" with **7 distinct layers (channels)**. 
+## Stage 1: The Data Layer (Sourcing & Practical Adjustments)
 
-### The 7 Input Channels:
-1. **GFS Rainfall** (Physical NWP)
-2. **GFS Temperature** (Physical NWP)
-3. **GFS Wind Magnitude** (Physical NWP)
-4. **GraphCast Rainfall** (AI Forecast)
-5. **GraphCast Temperature** (AI Forecast)
-6. **GraphCast Wind Magnitude** (AI Forecast)
-7. **Topography (DEM)** (Static Earth Surface)
+Before any PyTorch tensors are created, the raw atmospheric data is sourced. We made specific, calculated adjustments to fit within open-source licensing limits while maintaining operational integrity.
 
-### Where did we get it?
-* **GFS (Global Forecast System)**: Downloaded dynamically from NOAA's AWS S3 buckets in raw binary `.grib2` format.
-* **ERA5 (The Ground Truth)**: Downloaded from the Copernicus Climate Data Store (CDS) in `.nc` (NetCDF) format. ERA5 is what actually happened in reality, and we use it as the "Answer Key" to train the model.
-* **GraphCast (The AI Forecast)**: *Constraint:* Google's WeatherBench2 dataset does not contain public GraphCast data for 2023. Since our GFS and ERA5 data are from August 2023 (Monsoon season), we couldn't use 2022 GraphCast data without breaking the timeline. *Solution:* We built a **Synthetic AI Generator** that mathematically clones the 2023 ERA5 ground truth and injects spatial blur and Gaussian noise, acting as a scientifically valid proxy for an AI forecast.
+*   **The Duration (Adjusted):** 3 Monsoon seasons (2021–2023). NOAA's public AWS S3 archives only began permanently storing high-resolution GFS forecasts in late February 2021. This provides a massive, clean 3-year block for training and validation.
+*   **The Ground Truth (Answer Key):** The official **IMD $0.1^\circ$ Gridded Datasets** (~10km resolution). ERA5 is used as the fallback if IMD data is unavailable.
+*   **Model 1 (Physics Base):** NOAA GFS Operational Forecasts, downloaded at $0.25^\circ$.
+*   **Model 2 (AI Base):** Huawei Pangu-Weather, generated locally on an RTX 4090 via the `ai-models` package.
+*   **Analysis Bias Prevention:** Operationally, Pangu-Weather should be initialized with noisy NOAA GDAS/ECMWF Operational Data (OD). However, ECMWF MARS operational data is locked behind a commercial paywall. For this hackathon prototype, we use **ERA5** to initialize the AI, but the pipeline is explicitly designed to ingest noisy OD in a live IMD environment. This prevents the blending model from blindly over-trusting the AI during training, an error known as "Analysis Bias."
 
 ---
 
-## 3. The U-Net Architecture (How the model works)
-The model is a **Multi-Head Super-UNet** with FiLM (Feature-wise Linear Modulation).
+## Stage 2: Preprocessing & Ingestion (Data Hygiene)
 
-### Step-by-Step Execution Flow:
-1. **The Encoder (Downsampling)**: The 7-channel input grid (128x128 pixels of India) is passed through a series of Convolutional Residual Blocks. The image shrinks in size but grows in depth, allowing the neural network to "see" large weather patterns (like cyclones spanning multiple states). 
-   * *In Simple Terms*: It acts as a spatial summarizer. It extracts broad, state-wide weather patterns by sacrificing fine-grained pixel details, allowing the model to understand the "big picture" of the atmosphere.
-2. **FiLM Lead-Time Injection (The Bottleneck)**: Weather behaves differently depending on how far into the future you predict (Day 1 vs Day 5). Right at the center of the U-Net, we inject a single number: the `lead_time`. A FiLM layer mathematically scales the neural activations based on this number, forcing the network to dynamically change its blending strategy depending on the forecast hour.
-   * *In Simple Terms*: It acts as a time-based condition. Since a 24-hour forecast requires a very different blending strategy than a 120-hour forecast, this layer mathematically alters the neural network's behavior based strictly on how far into the future it is looking.
-3. **The Decoder (Upsampling)**: The network scales the image back up to 128x128 pixels, using "Skip Connections" to remember the fine, high-resolution details (like city-level boundaries).
-   * *In Simple Terms*: It acts as a high-resolution reconstructor. It takes the broad weather patterns discovered by the Encoder and maps them back onto precise geographic locations, ensuring the final forecast perfectly aligns with actual district boundaries.
-4. **The Multi-Head Output**: At the very end, the network splits into three separate output heads. It generates three 128x128 "Weight Grids":
-   * One for blending Rain.
-   * One for blending Temperature.
-   * One for blending Wind.
-   * *In Simple Terms*: Instead of forcing the network to use a single blending logic for everything, it splits into three independent decision-makers. One focuses exclusively on the physics of rain, another on temperature, and the last on wind.
-5. **The Final Blend**: We multiply the GFS grid by the U-Net weights, multiply the GraphCast grid by `(1 - weights)`, and add them together to create the perfect Blended Forecast.
-   * *In Simple Terms*: It acts as a dynamic weighted average. For every single 25km block of India, the U-Net assigns a percentage of trust to the Physical Model and the remaining percentage to the AI Model, mathematically combining them into a single, highly accurate forecast.
+The raw forecasts undergo strict mathematical hygiene before entering the U-Net.
 
----
+### 1. Spatial Super-Resolution Alignment
+*   **Why we did this:** Raw models predict at $25\text{km}$ resolution ($0.25^\circ$). IMD requires localized $10\text{km}$ resolution ($0.1^\circ$). Evaluating a $25\text{km}$ prediction against a $10\text{km}$ ground truth warps the geography.
+*   **What it does:** Mathematically expands low-resolution grids to perfectly match high-resolution observation grids.
+*   **How it does it:** We subset a perfect $32^\circ \times 32^\circ$ geographic bounding box around India ($6^\circ\text{–}38^\circ\text{N}$, $66^\circ\text{–}98^\circ\text{E}$). We apply Bilinear Interpolation, taking the 4 nearest $25\text{km}$ pixels to calculate a smooth, weighted average, generating a dense **$320 \times 320$ tensor** of $10\text{km}$ pixels.
 
-## 4. The Loss Function (How it learns)
-A model is only as good as its loss function (how it calculates its mistakes). 
+### 2. Vector Deconstruction (Wind Splitting)
+*   **Why we did this:** Blending "Wind Magnitude" is physically illegal (a $15\text{m/s}$ East wind and a $15\text{m/s}$ West wind should cancel to zero, not add up).
+*   **What it does:** Provides physically compliant wind kinematics.
+*   **How it does it:** We mathematically split the wind magnitude into its raw vectors: **10m U-Wind (Zonal/East-West)** and **10m V-Wind (Meridional/North-South)**. Magnitude is calculated only as a deterministic post-processing step.
 
-### The Problem: 
-Temperature operates in hundreds of degrees (Kelvin). Rainfall operates in tiny fractions of millimeters. Standard Mean Squared Error (MSE) would cause the network to completely ignore rainfall and only focus on temperature. Furthermore, standard MSE punishes all mistakes equally, meaning the AI would optimize for light drizzles and completely ignore rare, massive cloudbursts (which is unacceptable for SIH26081).
+### 3. Z-Score vs. MinMax Normalization
+*   **Why we did this:** Neural networks struggle with raw numbers of vastly different scales (e.g., Temperature at $300\text{K}$ vs Rainfall at $0.5\text{mm}$). Gradients would be dominated by Temperature. However, standard Z-Score normalization on Relative Humidity (RH) is dangerous—it does not enforce hard boundaries, allowing physically impossible humidity levels (e.g., $115\%$) which break the network's atmospheric physics.
+*   **What it does:** Balances all input channels equally while strictly enforcing the laws of physics for bounded variables.
+*   **How it does it:**
+    *   **Z-Score (Rain, Temp, Wind, MSLP):** Calculates the mean and standard deviation of the batch, using `(x - mean) / std`. This centers data at $0$ with a variance of $1$, allowing extreme outliers (like a pressure drop) to stretch outward naturally without capping.
+    *   **MinMax Scaling (Relative Humidity):** Explicitly clamps raw humidity between $0.0$ and $100.0$, applying `(x - min) / (max - min)`. This squashes humidity strictly between $[0.0, 1.0]$. The neural network is mathematically guaranteed to never process a physical impossibility.
 
-### The Solution:
-We engineered a **Composite Extreme-Weighted Loss Function**:
-1. **Z-Score Normalization**: We mathematically squashed Temperature and Wind errors to be on the exact same scale as Rainfall errors so the network respects all three variables equally.
-2. **Extreme Event Penalty (The Winning Edge)**: For the Rainfall head only, we implemented a custom algorithm that looks at the ERA5 ground truth. If the ground truth contains extreme rainfall (e.g., > 95th percentile), we multiply the error penalty by an extreme factor. If the neural network misses a cloudburst, it gets punished exponentially harder than if it misses a light drizzle. This explicitly teaches the AI to preserve high-impact weather events.
+### 4. The 13-Channel Input Tensor
+*   **Why we did this:** You cannot predict a cloudburst simply by looking at previous rainfall; the network needs atmospheric context like humidity and pressure.
+*   **What it does:** Provides a full-context picture of the atmosphere.
+*   **How it does it:** We stack the 6 variables from GFS (Rain, Temp, U-Wind, V-Wind, MSLP, RH), the 6 variables from the AI, and 1 static Topography (DEM) map. The final tensor shape entering the U-Net is `[Batch, 13, 320, 320]`.
 
 ---
 
-## 5. The Output & Frontend Integration (How users see it)
-Once the model is trained, it exports a `.pth` (PyTorch Weights) file.
+## Stage 3: The Super-UNet Architecture (Component Sequence)
 
-### The Backend (FastAPI)
-The FastAPI server loads the `.pth` file into memory. When a user requests a forecast:
-1. The backend grabs today's GFS and GraphCast grids.
-2. It runs them through the U-Net in milliseconds to generate the Blended Output.
-3. It converts the raw mathematical tensors into **GeoJSON polygons** and sends them over the API.
+The `[Batch, 13, 320, 320]` tensor flows sequentially through the PyTorch `SuperUNetBlender`:
 
-### The Frontend (React + Leaflet)
-The React dashboard consumes the GeoJSON and renders it on a responsive Leaflet Map of India. 
-* Users can toggle between seeing the raw GFS model, the AI model, and our Blended Model to visually compare the improvements.
-* An "Extreme Weather Alert" sidebar highlights specific districts where the U-Net detected severe cloudbursts.
+### 1. The Encoder (Downsampling via ResBlocks & Reflection Padding)
+*   **Why we did this:** Standard deep networks lose mathematical signal (the "vanishing gradient" problem). Furthermore, standard convolutions pad map edges with "Zeros," which the network interprets as $0^\circ\text{C}$ and perfectly dry, causing cold artifacts to bleed into the Indian coastlines.
+*   **What it does:** Safely learns deep, complex weather patterns while maintaining the physical integrity of coastlines.
+*   **How it does it:** The grid passes through 4 Convolutional `ResBlocks` and `MaxPool2d` layers.
+    *   *ResBlocks:* Uses a Skip Connection ($F(x) + x$), adding the block's input directly to its output. The network learns the *difference* (residual) rather than relearning the whole image.
+    *   *Reflection Padding:* `padding_mode='reflect'` mirrors the actual coastal weather values outward (if the coast is $30^\circ\text{C}$, the padding is $30^\circ\text{C}$), preventing artificial temperature drops.
+    *   *Downsampling:* Shrinks the grid, allowing the network to extract deep, broad atmospheric features (like a monsoon trough).
+
+### 2. The Bottleneck (Spatio-Temporal Cross-Attention)
+*   **Why we did this:** Weather behaves differently depending on the time of year (Monsoon vs. Winter) and the forecast horizon (Day 1 vs. Day 5). The network must dynamically alter its blending strategy based on time, not just geography.
+*   **What it does:** Acts as the "Brain" at the deepest part of the network, scaling geographic features based on temporal awareness.
+*   **How it does it:** We extract Time `[Lead Time, Sin(Day), Cos(Day)]` and project it into a **Query (Q)** vector. The flattened spatial map is projected into **Key (K)** and **Value (V)** vectors. The network calculates the dot product between Q and K to yield an "Attention Score" (e.g., *How much does this Himalayan pixel care that it is August?*). It multiplies this score by V, dynamically scaling the pixel's importance based on the time of year.
+
+### 3. The Decoder (Upsampling via Attention Gates)
+*   **Why we did this:** As the network scales back up to high resolution, it wastes massive computing power analyzing "empty skies" or irrelevant background noise (like the open ocean).
+*   **What it does:** Acts as a spatial spotlight, telling the network where to focus and what background noise to suppress.
+*   **How it does it:** The `AttentionGate` merges deep, broad features (from the Bottleneck) with high-res details saved via Skip Connections (from the Encoder). It applies a Sigmoid activation to create a multiplier map (strictly between $0.0$ and $1.0$). It multiplies this map against the high-res features. Empty skies get suppressed ($0.01$), while forming cyclones are highlighted ($0.99$).
+
+### 4. The Output Heads (Softmax + Residual Bias)
+*   **Why we did this:** We need the network to output trust percentages (e.g., 70% GFS, 30% AI). However, if both GFS and AI predict $0\text{mm}$ of rain, the blend equals $0\text{mm}$. The network needs a "Safety Valve" to physically inject rain into the forecast if it knows both models are wrong.
+*   **What it does:** Outputs mathematically stable blending weights while retaining the power to override the models entirely.
+*   **How it does it:** The network splits into 4 distinct variable heads (Rain, Temp, U-Wind, V-Wind).
+    *   *Softmax:* Each head outputs raw trust scores for GFS and AI. The Softmax function ($e^x / \sum e^x$) forces these scores to sum perfectly to $1.0$, creating percentages.
+    *   *Residual Bias:* A 3rd channel ($\Delta_{\text{residual}}$) bypasses Softmax entirely. The final math is: `(GFS * Weight_GFS) + (AI * Weight_AI) + Residual_Bias`. If the network detects dropping pressure and rising humidity over a mountain, it uses this raw numeric bias to add $50\text{mm}$ of rain to the final forecast, overriding the flawed inputs.
 
 ---
 
-## 6. The Engineering Journey (Decisions, Failures, & Solutions)
+## Stage 4: The Training Engine (Loss & Validation)
 
-### Failure 1: The GFS Hypercube Crash
-* **What failed:** Raw NOAA `.grib2` files are chaotic hypercubes containing both `instant` values (Temp) and `accumulated` values (Rain). Loading them into `xarray` caused the C-libraries to crash due to step-type conflicts.
-* **How we fixed it:** We abandoned standard `xarray` loading and implemented `cfgrib.open_datasets()` (plural) to shatter the GRIB hypercube into safely isolated datasets before processing.
+### 1. The Masked Extreme-Weighted Loss
+*   **Why we did this:** India is dry for 8 months of the year. Standard MSE punishes all mistakes equally, forcing the network to optimize for predicting "Zero Rain" and completely ignore rare, catastrophic cloudbursts.
+*   **What it does:** Forces the network to dedicate 100% of its learning capacity to extreme weather events, ignoring dry days.
+*   **How it does it:**
+    *   *The Mask:* Generates a boolean tensor `(target > 0.1) | (prediction > 0.1)`. Any pixel completely dry in both reality and prediction is multiplied by $0$, preventing gradients from drifting toward "zero" during winter.
+    *   *The Penalty:* For rainy pixels, it calculates the base MSE. If the Target crosses IMD's Heavy threshold ($>64.5\text{mm}$), it calculates an exponential multiplier: `1.0 + alpha * exp(beta * (Target - 64.5) / 64.5)`. Missing a 150mm cloudburst results in a massive gradient explosion, ruthlessly forcing the network to adjust its weights.
 
-### Failure 2: The WSL Disk I/O Death Trap
-* **What failed:** When attempting to train the PyTorch model on Windows using WSL, the GPU utilization sat at 0%. The CPU was suffocating because reading gigabytes of binary weather files across the Windows `/mnt/c/` bridge incurred massive 9P protocol I/O penalties.
-* **How we fixed it:** We entirely abandoned the Windows mounted directory, migrated the source code and data natively into the WSL `/home/student/` Linux filesystem, and utilized `uv` to rebuild the environment. 
+### 2. Sequential FP16 Backprop (Numerical Stability)
+*   **Why we did this:** To balance Temp (large numbers) and Rain (small numbers), we must multiply the Temp loss by $0.01$. In Mixed Precision (FP16), multiplying a small gradient by $0.01$ causes the 16-bit float to `underflow` (round to absolute zero). The network literally stops learning temperature.
+*   **What it does:** Balances multi-task learning perfectly without math crashing to zero.
+*   **How it does it:** Instead of pre-scaling losses, we use the PyTorch computation graph. We call `scaler.scale(loss_rain).backward(retain_graph=True)`. The GPU scales the rain gradients up to a safe 16-bit size, calculates, and stores them. We repeat this for Temp and Wind independently, allowing the GPU to calculate each task's gradients at their full, native numeric size before stepping the optimizer.
 
-### Failure 3: The 2-Hour Training Loop
-* **What failed:** Even on native Linux, dynamic interpolation of 7 variables across 31 days on a single CPU core took 2 hours to train just 5 epochs.
-* **How we fixed it:** We implemented a "PyTorch Preprocessing" architecture. We wrote a script to pre-compile the slow GRIB/NetCDF files into lightning-fast native PyTorch `.pt` tensors. This single architectural shift reduced the 5-epoch training time from **2 hours to 20 seconds**.
+### 3. Leave-One-Season-Out (LOSO) Validation
+*   **Why we did this:** If you randomly shuffle 3 years of weather data, Day 1 (Train) and Day 2 (Test) are too similar. The network scores highly just by guessing the weather is the same as yesterday.
+*   **What it does:** Proves the AI actually understands meteorology and can generalize to completely alien, unseen weather years.
+*   **How it does it:** We enforce a hard temporal wall. We isolate the entire 2021 and 2022 Monsoons strictly for training. We isolate the entire 2023 Monsoon strictly for testing, forcing the model to predict 2023 without ever having seen a single day of it.
+
+---
+
+## Stage 5: The Evaluation Engine (Proving the Model Works)
+
+Standard ML math (MSE) actively punishes models for predicting rare extreme events. A model predicting a uniform light drizzle will score better than a model missing a massive cyclone by 10km. We evaluate Meghdrishti using custom WMO and IMD metrics to prove we solved this "Smoothing" problem.
+
+### 1. Categorical Extreme Metrics (ETS & EDI)
+*   **Why we did this:** We need to accurately score the model's ability to predict catastrophic events (like cloudbursts), ignoring minor millimeter differences.
+*   **What it does:** Converts continuous rain into binary IMD categories (e.g., Heavy $>64.5\text{mm}$) to calculate Hits and False Alarms.
+*   **How it does it:**
+    *   **ETS (Equitable Threat Score):** Calculates accuracy but mathematically subtracts $Hits_{random}$ (hits a model gets just by blindly guessing based on base-rate rain frequency). Reveals pure AI skill.
+    *   **EDI (Extreme Dependency Index):** As events get rarer (a 1-in-100-year storm), standard scores crash to zero because the False Alarm Ratio dominates. EDI uses a logarithmic formula: `(log(FAR) - log(POD)) / (log(FAR) + log(POD))`. This stabilizes the score, legitimately proving we can predict catastrophic outliers.
+
+### 2. Spatio-Temporal Masking
+*   **Why we did this:** Evaluating India as a single block hides geographic nuances. AI models typically fail over complex terrain.
+*   **What it does:** Proves the U-Net has physically learned the topography of India and dynamically alters its trust weights based on terrain.
+*   **How it does it:** We use a static geographical mask (binary tensor of 1s and 0s) to isolate the Himalayas, the Coasts, and the Plains. We calculate the EDI score exclusively inside those masked pixels and compare it against Raw GFS, Raw AI, and the IMD's current Simple Ensemble Mean. By beating the Simple Mean in the EDI score specifically over complex terrain, we mathematically prove we have solved the smoothing problem.

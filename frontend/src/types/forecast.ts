@@ -2,7 +2,7 @@
 
 export type Variable = 'rain' | 'temp' | 'wind'
 export type Layer = 'blended' | 'gfs' | 'ai' | 'trust'
-export type DataSource = 'processed' | 'synthetic'
+export type DataSource = 'processed' | 'synthetic' | 'live_noaa_s3'
 export type WeightsMode = 'trained' | 'untrained'
 export type ImdCategory = 'heavy' | 'very_heavy' | 'extremely_heavy'
 export type WindCategory = 'strong_wind' | 'gale' | 'storm'

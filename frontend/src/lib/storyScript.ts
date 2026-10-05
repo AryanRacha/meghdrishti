@@ -75,11 +75,11 @@ function resetMap(c: StoryControls) {
 }
 
 export const STORY: Step[] = [
-  // --- Act 1: context -------------------------------------------------------
+  // --- Act 1: Context & Architecture (fast) ---
   {
     title: 'Meghdrishti · मेघदृष्टि',
-    text: () => 'AI-NWP weather forecast blending and disaster decision support. SIH26081 · Ministry of Earth Sciences',
-    durationMs: 6000,
+    text: () => 'Real-time AI-NWP weather blending and disaster decision support. SIH26081.',
+    durationMs: 4000,
     panel: 'intro',
     run: (c) => {
       resetMap(c)
@@ -88,9 +88,9 @@ export const STORY: Step[] = [
     },
   },
   {
-    title: 'The problem',
-    text: () => 'Physics models miss local extremes; AI models smooth them; plain averaging dilutes both.',
-    durationMs: 8000,
+    title: 'The Challenge',
+    text: () => 'Physics models (GFS) miss local extremes; AI models smooth them; averaging dilutes both.',
+    durationMs: 4500,
     panel: 'problem',
     run: (c) => {
       resetMap(c)
@@ -99,20 +99,9 @@ export const STORY: Step[] = [
     },
   },
   {
-    title: 'Super-UNet architecture',
-    text: () => '7 input channels → residual U-Net with FiLM lead-time conditioning → 3 per-pixel trust heads.',
-    durationMs: 9500,
-    panel: 'architecture',
-    run: (c) => {
-      resetMap(c)
-      c.setDate(pick(c, TOUR_DATE))
-      c.setLayer('blended')
-    },
-  },
-  {
-    title: 'Extreme-weighted loss',
-    text: () => 'Missing a cloudburst costs exponentially more than missing a drizzle.',
-    durationMs: 7000,
+    title: 'Super-UNet + Extreme Loss',
+    text: () => 'Our PyTorch U-Net blends them using an extreme-weighted loss function that explicitly preserves cloudbursts.',
+    durationMs: 6000,
     panel: 'loss',
     run: (c) => {
       resetMap(c)
@@ -121,11 +110,11 @@ export const STORY: Step[] = [
     },
   },
 
-  // --- Act 2: the forecast ---------------------------------------------------
+  // --- Act 2: Live Data Ingestion ---
   {
-    title: 'Input 1 · NOAA GFS',
-    text: () => 'Physics-based global model at 0.25°, cropped to India (8–38°N, 68–98°E).',
-    durationMs: 4500,
+    title: 'Input 1 · NOAA GFS (Live)',
+    text: () => 'Real-time physics model at 0.25°, fetched via S3 byte-range perfectly cropped to India.',
+    durationMs: 4000,
     run: (c) => {
       c.setCompare(false)
       c.setVariable('rain')
@@ -133,8 +122,8 @@ export const STORY: Step[] = [
     },
   },
   {
-    title: 'Input 2 · AI forecast',
-    text: () => 'Data-driven AI model for the same day: fast, but tends to smooth extremes.',
+    title: 'Input 2 · ECMWF AIFS (Live)',
+    text: () => 'Real-time operational AI weather model (GraphCast equivalent) fetched via Azure Open Data.',
     durationMs: 4500,
     run: (c) => {
       c.setCompare(false)
@@ -143,9 +132,9 @@ export const STORY: Step[] = [
     },
   },
   {
-    title: 'Output · Super-UNet blend',
-    text: () => 'Every ~26 km cell gets its own GFS/AI mix, learned from ERA5 ground truth.',
-    durationMs: 4500,
+    title: 'Output · Super-UNet Blend',
+    text: () => 'Every ~26 km grid cell gets its own learned GFS/AI mix, computed in real-time.',
+    durationMs: 4000,
     run: (c) => {
       c.setCompare(false)
       c.setVariable('rain')
@@ -153,33 +142,19 @@ export const STORY: Step[] = [
     },
   },
   {
-    title: 'Side by side',
-    text: () => 'Raw GFS on the left, the Super-UNet blend on the right.',
-    durationMs: 8500,
-    run: async (c, t) => {
-      c.setInspectPoint(null)
-      c.setVariable('rain')
-      c.setSwipe(0.85)
-      c.setCompare(true)
-      await t.animate(0.85, 0.22, 3500, c.setSwipe)
-      await t.animate(0.22, 0.55, 2200, c.setSwipe)
-    },
-  },
-  {
     title: 'Explainable AI · Trust Map',
-    text: () => 'Teal: the model trusts physics (GFS). Violet: it trusts AI. Forecasters see why.',
-    durationMs: 6000,
+    text: () => 'Teal: the network trusts physics (GFS). Violet: it trusts AI. Forecasters see exactly why it predicts what it does.',
+    durationMs: 5500,
     run: (c) => {
       c.setCompare(false)
-      c.setInspectPoint(null)
       c.setVariable('rain')
       c.setLayer('trust')
     },
   },
   {
     title: 'XAI · Pixel Inspector',
-    text: () => 'Sample any ~26 km cell to see the mathematical blending equation and per-model trust weights.',
-    durationMs: 7000,
+    text: () => 'Inspect any cell to see the mathematical blending equation and per-model spatial trust weights.',
+    durationMs: 5000,
     run: (c) => {
       c.setCompare(false)
       c.setLayer('trust')
@@ -187,56 +162,12 @@ export const STORY: Step[] = [
       c.setInspectPoint({ lat: 31.7, lon: 77.0 })
     },
   },
-  {
-    title: 'Rain, temperature & wind',
-    text: () => 'Each variable has its own trust head and its own blended field.',
-    durationMs: 7500,
-    run: async (c, t) => {
-      c.setInspectPoint(null)
-      c.setVariable('temp')
-      await t.wait(2500)
-      c.setLayer('blended')
-      await t.wait(2500)
-      c.setVariable('wind')
-    },
-  },
-  {
-    title: 'Lead time · FiLM conditioning',
-    text: () => 'The blending strategy adapts to how far ahead we forecast: Day 1 to Day 5.',
-    durationMs: 6500,
-    panels: CONTROLS,
-    run: async (c, t) => {
-      c.setInspectPoint(null)
-      c.setLayer('blended')
-      c.setVariable('rain')
-      for (const h of [48, 72, 96, 120]) {
-        await t.wait(1300)
-        c.setLeadTime(h)
-      }
-    },
-  },
-  {
-    title: 'Monsoon time-lapse',
-    text: () => 'Day-by-day evolution of the blended rainfall forecast.',
-    durationMs: 9000,
-    panels: CONTROLS,
-    run: async (c, t) => {
-      c.setVariable('rain')
-      c.setLeadTime(24)
-      c.setDate(pick(c, TIMELAPSE_START))
-      await t.wait(800)
-      c.setPlaying(true)
-      await t.wait(7500)
-      c.setPlaying(false)
-      c.setDate(pick(c, TOUR_DATE))
-    },
-  },
 
-  // --- Act 3: impact and action ----------------------------------------------
+  // --- Act 3: Threat Matrix & Dispatch ---
   {
     title: 'Threat Matrix',
-    text: (c) => `${c.threats.length} IMD heavy-rain regions (≥ 64.5 mm) auto-detected and ranked by severity.`,
-    durationMs: 5000,
+    text: (c) => `${c.threats.length} IMD heavy-rain regions auto-detected and ranked by severity in real-time.`,
+    durationMs: 4500,
     panels: THREATS,
     run: (c) => {
       c.setPlaying(false)
@@ -244,42 +175,26 @@ export const STORY: Step[] = [
       c.setLeadTime(24)
       c.setDate(pick(c, TOUR_DATE))
       c.selectThreat(null)
+      c.setInspectPoint(null)
+      c.setLayer('blended')
     },
   },
   {
-    title: 'Threat #1',
+    title: 'Impact-Based Early Warning',
     text: (c) => {
       const t = top(c)
-      return t
-        ? `${t.district}, ${t.state}: ${Math.round(t.peak)} ${t.units} in 24 h · IMD ${CATEGORY_LABELS[t.category]}`
-        : 'No heavy-rain regions in this forecast.'
+      return t ? `${formatPeople(t.population_exposed)} people exposed in ${t.district}. Risk index: ${t.risk_index}/100.` : ''
     },
-    durationMs: 5000,
-    panels: THREATS,
-    run: (c) => {
-      c.setPlaying(false)
-      c.setVariable('rain')
-      c.setLeadTime(24)
-      c.setDate(pick(c, TOUR_DATE))
-      c.selectThreat(top(c)?.id ?? null)
-    },
-  },
-  {
-    title: 'Impact-based forecasting',
-    text: (c) => {
-      const t = top(c)
-      return t ? `${formatPeople(t.population_exposed)} people in the affected area · Risk index ${t.risk_index}/100` : ''
-    },
-    durationMs: 5000,
+    durationMs: 4000,
     panels: THREATS,
     run: (c) => {
       c.selectThreat(top(c)?.id ?? null)
     },
   },
   {
-    title: 'Last-mile warning',
-    text: (c) => `Auto-generated public warning in ${LANGUAGES[regional(top(c))].label}, read aloud.`,
-    durationMs: 7000,
+    title: 'Regional Last-Mile Voice Alert',
+    text: (c) => `Auto-generated public warning translated to ${LANGUAGES[regional(top(c))].label}, read aloud.`,
+    durationMs: 6500,
     run: async (c) => {
       c.selectThreat(top(c)?.id ?? null)
       const t = top(c)
@@ -291,41 +206,19 @@ export const STORY: Step[] = [
     },
   },
   {
-    title: '12 Indian languages',
-    text: () => 'Hindi, English and the state language: Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam and more.',
-    durationMs: 5000,
-    run: async (c, t) => {
-      c.selectThreat(top(c)?.id ?? null)
-      c.setDispatch(false)
-      c.setLang('hi')
-      await t.wait(2500)
-      c.setLang('en')
-    },
-  },
-  {
-    title: 'Dispatch',
-    text: () => 'One click to Cell Broadcast, SMS, WhatsApp and the District Control Room.',
-    durationMs: 6500,
-    run: (c) => {
-      c.selectThreat(top(c)?.id ?? null)
-      c.setBulletin(false)
-      c.setDispatch(true)
-    },
-  },
-  {
     title: 'Official IMD Civil Bulletin',
     text: () => 'One-click official impact-based disaster advisory with NDMA protocols and print-ready PDF export.',
-    durationMs: 7500,
+    durationMs: 5000,
     run: (c) => {
       c.setDispatch(false)
       c.setBulletin(true)
     },
   },
-  // --- Close -------------------------------------------------------------------
+  // --- Close ---
   {
     title: 'Meghdrishti · मेघदृष्टि',
     text: () => 'Seeing into the clouds, from forecast to last-mile action.',
-    durationMs: 7000,
+    durationMs: 4500,
     panel: 'outro',
     run: (c) => {
       c.setBulletin(false)

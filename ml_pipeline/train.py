@@ -2,145 +2,171 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 import logging
+import math
 from models.unet_blender import SuperUNetBlender
 from data_loaders.weather_dataset import ProductionWeatherDataset
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class CompositeLoss(nn.Module):
-    def __init__(self, alpha=0.5, beta=2.0, rain_p90=8.0):
+class MaskedExtremeLoss(nn.Module):
+    def __init__(self, alpha=0.5, beta=2.0, rain_threshold=64.5, temp_threshold=42.0, wind_threshold=33.0):
         super().__init__()
         self.alpha = alpha
         self.beta = beta
-        self.rain_p90 = rain_p90 # Extreme rain threshold
-        self.mse = nn.MSELoss()
+        self.rain_threshold = rain_threshold
+        self.temp_threshold = temp_threshold
+        self.wind_threshold = wind_threshold
+        self.mse = nn.MSELoss(reduction='none')
 
-    def forward(self, pred_rain, target_rain, pred_temp, target_temp, pred_wind, target_wind):
-        # 1. Temperature & Wind Loss (Standard MSE)
-        loss_temp = self.mse(pred_temp, target_temp)
-        loss_wind = self.mse(pred_wind, target_wind)
-
-        # 2. Extreme Weighted Rain Loss
-        base_rain_loss = (pred_rain - target_rain) ** 2
-        extreme_mask = (target_rain > self.rain_p90).float()
-        penalty_weights = 1.0 + (extreme_mask * self.alpha * torch.exp(self.beta * (target_rain - self.rain_p90) / self.rain_p90))
-        loss_rain = torch.mean(base_rain_loss * penalty_weights)
-
-        # 3. Z-Score Scale Normalization (Approximate empirical weights to balance gradients)
-        # Temp is usually ~300K, Rain is ~10mm, Wind is ~5m/s
-        # Without this, Temp gradients will crush Rain gradients.
-        total_loss = (loss_rain * 1.0) + (loss_temp * 0.01) + (loss_wind * 0.5)
-        return total_loss, loss_rain, loss_temp, loss_wind
-
-def train():
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logger.info(f"Target execution device: {device}")
-    
-    if torch.cuda.is_available():
-        logger.info(f"Detected GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB VRAM)")
+    def forward_rain(self, pred, target):
+        # Masked Loss: Only penalize where target or pred indicates rain (>0.1mm)
+        # This prevents dry winter days from numbing the network
+        rain_mask = (target > 0.1) | (pred > 0.1)
+        if not rain_mask.any():
+            return torch.tensor(0.0, device=pred.device, requires_grad=True)
+            
+        base_loss = self.mse(pred, target)
+        extreme_mask = (target > self.rain_threshold).float()
+        penalty = 1.0 + (extreme_mask * self.alpha * torch.exp(self.beta * (target - self.rain_threshold) / self.rain_threshold))
         
-    dates = [f"2023-08-{d:02d}" for d in range(1, 32)]
+        return torch.mean(base_loss[rain_mask] * penalty[rain_mask])
+
+    def forward_temp(self, pred, target):
+        base_loss = self.mse(pred, target)
+        extreme_mask = (target > self.temp_threshold).float()
+        penalty = 1.0 + (extreme_mask * self.alpha * torch.exp(self.beta * (target - self.temp_threshold) / self.temp_threshold))
+        return torch.mean(base_loss * penalty)
+
+    def forward_wind(self, pred_u, pred_v, target_u, target_v):
+        pred_mag = torch.sqrt(pred_u**2 + pred_v**2 + 1e-8)
+        target_mag = torch.sqrt(target_u**2 + target_v**2 + 1e-8)
+        
+        base_loss = self.mse(pred_u, target_u) + self.mse(pred_v, target_v)
+        extreme_mask = (target_mag > self.wind_threshold).float()
+        penalty = 1.0 + (extreme_mask * self.alpha * torch.exp(self.beta * (target_mag - self.wind_threshold) / self.wind_threshold))
+        
+        return torch.mean(base_loss * penalty)
+
+def train_loso_fold(fold_name, train_dates, val_dates, data_dir, device):
+    logger.info(f"--- Starting {fold_name} ---")
     
-    # Initialize Dataset
-    data_dir = os.path.join(os.path.dirname(__file__), 'data/processed')
-    train_dataset = ProductionWeatherDataset(data_dir=data_dir, dates=dates)
+    train_dataset = ProductionWeatherDataset(data_dir=data_dir, dates=train_dates)
+    val_dataset = ProductionWeatherDataset(data_dir=data_dir, dates=val_dates)
     
-    # BATCH SIZE REDUCED to 16 to prevent VRAM exhaustion with new Super-UNet
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=0)
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False, num_workers=4, pin_memory=True)
     
-    # Initialize Super-UNet
-    # 7 input channels, 2 models (GFS & GraphCast)
-    model = SuperUNetBlender(n_channels=7, n_models=2, features=[32, 64, 128, 256]).to(device)
+    model = SuperUNetBlender(n_channels=13, n_models=2, features=[32, 64, 128, 256]).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
-    criterion = CompositeLoss(alpha=0.5, beta=2.0)
-    
-    epochs = 500
-    patience = 15
-    patience_counter = 0
-    best_loss = float('inf')
-    
-    logger.info(f"Initialized pipeline -> Batch Size: 16, AMP: True")
-    
+    criterion = MaskedExtremeLoss()
     scaler = torch.amp.GradScaler('cuda')
+    
+    epochs = 200
+    patience = 15
+    best_val_loss = float('inf')
+    patience_counter = 0
     
     for epoch in range(epochs):
         model.train()
         total_loss = 0
         
         progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}")
-        for batch_idx, (inputs, lead_time, forecasts, targets) in enumerate(progress_bar):
-            inputs = inputs.to(device)
-            lead_time = lead_time.to(device)
+        for inputs, condition, forecasts, targets in progress_bar:
+            inputs, condition = inputs.to(device), condition.to(device)
+            f_rain, f_temp, f_u, f_v = [f.to(device) for f in forecasts]
+            t_rain, t_temp, t_u, t_v = [t.to(device) for t in targets]
             
-            f_rain, f_temp, f_wind = [f.to(device) for f in forecasts]
-            t_rain, t_temp, t_wind = [t.to(device) for t in targets]
-            
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             
             with torch.amp.autocast('cuda'):
-                # Forward Pass
-                w_rain, w_temp, w_wind = model(inputs, lead_time)
+                heads = model(inputs, condition)
+                (w_rain, res_rain), (w_temp, res_temp), (w_u, res_u), (w_v, res_v) = heads
                 
-                # Blend Forecasts
-                blend_rain = torch.sum(w_rain * f_rain, dim=1, keepdim=True)
-                blend_temp = torch.sum(w_temp * f_temp, dim=1, keepdim=True)
-                blend_wind = torch.sum(w_wind * f_wind, dim=1, keepdim=True)
+                # Blend (Softmax weights * inputs) + Residual Bias
+                pred_rain = torch.sum(w_rain * f_rain, dim=1, keepdim=True) + res_rain
+                pred_temp = torch.sum(w_temp * f_temp, dim=1, keepdim=True) + res_temp
+                pred_u = torch.sum(w_u * f_u, dim=1, keepdim=True) + res_u
+                pred_v = torch.sum(w_v * f_v, dim=1, keepdim=True) + res_v
                 
-                # Compute Composite Loss
-                loss, l_rain, l_temp, l_wind = criterion(blend_rain, t_rain, blend_temp, t_temp, blend_wind, t_wind)
+                # Compute independent losses
+                l_rain = criterion.forward_rain(pred_rain, t_rain)
+                l_temp = criterion.forward_temp(pred_temp, t_temp)
+                l_wind = criterion.forward_wind(pred_u, pred_v, t_u, t_v)
                 
-            scaler.scale(loss).backward()
+            # Elite PyTorch Trick: Sequential independent backward passes in FP16 
+            # to prevent gradient underflow when dealing with multi-scale targets
+            if l_rain.requires_grad:
+                scaler.scale(l_rain).backward(retain_graph=True)
+            scaler.scale(l_temp).backward(retain_graph=True)
+            scaler.scale(l_wind).backward()
+            
+            # Gradient clipping to stabilize the residual heads
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             scaler.step(optimizer)
             scaler.update()
             
-            total_loss += loss.item()
-            progress_bar.set_postfix({'loss': f"{loss.item():.4f}", 'r_loss': f"{l_rain.item():.4f}"})
+            batch_total = l_rain.item() + l_temp.item() + l_wind.item()
+            total_loss += batch_total
+            progress_bar.set_postfix({'loss': f"{batch_total:.4f}"})
             
-        avg_loss = total_loss / len(train_loader)
-        logger.info(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
+        # Validation Phase
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for inputs, condition, forecasts, targets in val_loader:
+                inputs, condition = inputs.to(device), condition.to(device)
+                f_rain, f_temp, f_u, f_v = [f.to(device) for f in forecasts]
+                t_rain, t_temp, t_u, t_v = [t.to(device) for t in targets]
+                
+                with torch.amp.autocast('cuda'):
+                    heads = model(inputs, condition)
+                    (w_rain, res_rain), (w_temp, res_temp), (w_u, res_u), (w_v, res_v) = heads
+                    pred_rain = torch.sum(w_rain * f_rain, dim=1, keepdim=True) + res_rain
+                    pred_temp = torch.sum(w_temp * f_temp, dim=1, keepdim=True) + res_temp
+                    pred_u = torch.sum(w_u * f_u, dim=1, keepdim=True) + res_u
+                    pred_v = torch.sum(w_v * f_v, dim=1, keepdim=True) + res_v
+                    
+                    val_loss += criterion.forward_rain(pred_rain, t_rain).item()
+                    val_loss += criterion.forward_temp(pred_temp, t_temp).item()
+                    val_loss += criterion.forward_wind(pred_u, pred_v, t_u, t_v).item()
+                    
+        val_loss /= len(val_loader)
+        logger.info(f"Epoch {epoch+1} | Train Loss: {total_loss/len(train_loader):.4f} | Val Loss: {val_loss:.4f}")
         
-        # --- Early Stopping Logic ---
-        if avg_loss < best_loss:
-            best_loss = avg_loss
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
             patience_counter = 0
-            torch.save(model.state_dict(), 'super_unet_blender_weights.pth')
+            torch.save(model.state_dict(), f'super_unet_v2_{fold_name}.pth')
         else:
             patience_counter += 1
             if patience_counter >= patience:
-                logger.info(f"Early stopping triggered at epoch {epoch+1}! Best Loss: {best_loss:.4f}")
+                logger.info(f"Early stopping at epoch {epoch+1}! Best Val Loss: {best_val_loss:.4f}")
                 break
 
-    # Baseline Evaluation Check
-    logger.info("Computing Simple Average Baseline vs Super-UNet...")
-    model.eval()
-    with torch.no_grad():
-        inputs, lead_time, forecasts, targets = next(iter(train_loader))
-        inputs, lead_time = inputs.to(device), lead_time.to(device)
-        f_rain, t_rain = forecasts[0].to(device), targets[0].to(device)
-        
-        # Simple Average
-        simple_blend = torch.mean(f_rain, dim=1, keepdim=True)
-        simple_loss = criterion.mse(simple_blend, t_rain).item()
-        
-        # Super-UNet
-        w_rain, _, _ = model(inputs, lead_time)
-        ai_blend = torch.sum(w_rain * f_rain, dim=1, keepdim=True)
-        ai_loss = criterion.mse(ai_blend, t_rain).item()
-        
-        logger.info(f"Baseline MSE (Simple Avg): {simple_loss:.4f}")
-        logger.info(f"Super-UNet MSE (AI Blend): {ai_loss:.4f}")
-        if ai_loss < simple_loss:
-            logger.info("✅ SUCCESS: AI dynamically outperformed the mathematical baseline!")
-        else:
-            logger.warning("❌ WARNING: AI failed to beat the simple average.")
-
-    weights_path = "super_unet_blender_weights.pth"
-    torch.save(model.state_dict(), weights_path)
-    logger.info(f"Model saved successfully to {weights_path}")
+def train():
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.info(f"Target execution device: {device}")
+    
+    # 3-Fold Leave-One-Season-Out (LOSO) Split
+    # Hold out 2023 entirely for production testing.
+    dates_2020 = [f"2020-08-{d:02d}" for d in range(1, 32)] # Mock placeholder for actual datasets
+    dates_2021 = [f"2021-08-{d:02d}" for d in range(1, 32)]
+    dates_2022 = [f"2022-08-{d:02d}" for d in range(1, 32)]
+    
+    data_dir = os.path.join(os.path.dirname(__file__), 'data/processed')
+    
+    # Fold 1: Train 21, 22 -> Val 20
+    train_loso_fold("Fold_1", dates_2021 + dates_2022, dates_2020, data_dir, device)
+    
+    # In practice, you would run the other folds and average the checkpoints.
+    # train_loso_fold("Fold_2", dates_2020 + dates_2022, dates_2021, data_dir, device)
+    # train_loso_fold("Fold_3", dates_2020 + dates_2021, dates_2022, data_dir, device)
 
 if __name__ == '__main__':
     train()

@@ -33,7 +33,7 @@ const css = (rgb: RGB) => `rgb(${rgb.map(Math.round).join(',')})`
 
 // IMD 24 h rainfall categories (mm) with vibrant, luminous radar hues
 const RAIN_BINS: Bin[] = [
-  { min: 1, color: '#38bdf8', label: 'Very light' },
+  { min: 0.1, color: '#38bdf8', label: 'Very light' },
   { min: 2.5, color: '#0ea5e9', label: 'Light' },
   { min: 15.6, color: '#2563eb', label: 'Moderate' },
   { min: 64.5, color: '#facc15', label: 'Heavy' },
@@ -51,7 +51,7 @@ const RAIN: Scale = {
     return null
   },
   // Vibrant radar precipitation gradient: luminous and punchy
-  alpha: (v) => (v < 1 ? 0 : v < 15.6 ? 0.45 + ((v - 1) / 14.6) * 0.28 : v < 64.5 ? 0.78 : 0.88),
+  alpha: (v) => (v < 0.1 ? 0 : v < 15.6 ? 0.45 + ((v - 0.1) / 15.5) * 0.28 : v < 64.5 ? 0.78 : 0.88),
 }
 
 function continuous(stops: Stop[], minLabel: string, maxLabel: string, opacity: number): Scale {
