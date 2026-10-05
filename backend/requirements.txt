@@ -60,12 +60,9 @@ eccodes==2.49.0
     # via
     #   backend
     #   cfgrib
-eccodeslib==2.49.0.30
     # via backend
-eckitlib==2.3.0.30
     # via
     #   backend
-    #   eccodeslib
 ecmwf-opendata==0.3.34
     # via backend
 edge-tts==7.2.8
