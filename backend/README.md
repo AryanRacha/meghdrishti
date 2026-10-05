@@ -3,7 +3,8 @@ title: Meghdrishti API
 emoji: 🌩️
 colorFrom: blue
 colorTo: indigo
-sdk: docker
+sdk: gradio
+app_file: app.py
 pinned: false
 ---
 
