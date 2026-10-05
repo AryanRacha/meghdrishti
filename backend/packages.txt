@@ -1,1 +1,2 @@
-libeccodes0\nlibeccodes-dev
+libeccodes0
+libeccodes-dev
