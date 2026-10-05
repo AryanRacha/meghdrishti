@@ -20,5 +20,4 @@ with gr.Blocks() as demo:
 app = gr.mount_gradio_app(fastapi_app, demo, path="/")
 
 # 3. WE MUST BLOCK THE THREAD so it doesn't Exit 0!
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+uvicorn.run(app, host="0.0.0.0", port=7860)
