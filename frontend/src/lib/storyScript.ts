@@ -1,6 +1,6 @@
 import type { Layer, Threat, Variable } from '../types/forecast'
 import { LANGUAGES, alertText, languagesFor, type LangCode } from './alerts'
-import { CATEGORY_LABELS, formatPeople } from './format'
+import { formatPeople } from './format'
 
 export type StoryPanelId = 'intro' | 'problem' | 'architecture' | 'loss' | 'outro'
 
@@ -11,7 +11,6 @@ export interface Panels {
 }
 
 export const PANELS_HIDDEN: Panels = { left: false, right: false }
-const CONTROLS: Panels = { left: true, right: false }
 const THREATS: Panels = { left: false, right: true }
 
 export interface StoryControls {
@@ -54,7 +53,6 @@ export interface Step {
 
 // A monsoon day with threats across several language regions
 const TOUR_DATE = '2023-08-27'
-const TIMELAPSE_START = '2023-08-20'
 
 const top = (c: StoryControls): Threat | null => c.threats[0] ?? null
 /** First two sentences, so the spoken part of the tour stays short (full text stays on screen). */
